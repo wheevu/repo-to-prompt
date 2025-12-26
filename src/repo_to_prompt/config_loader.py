@@ -10,6 +10,7 @@ CLI flags override config file values.
 
 from __future__ import annotations
 
+import importlib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -17,19 +18,24 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from repo_to_prompt.redactor import RedactionConfig
 
+# Optional runtime modules (loaded via importlib); typed as Any to avoid stub issues.
+tomllib: Any | None
+yaml: Any | None
+
 # Optional imports for config file parsing
 try:
-    import tomllib  # Python 3.11+
+    import tomllib as _tomllib  # Python 3.11+
 except ImportError:
     try:
-        import tomli as tomllib  # type: ignore[import-not-found]
+        _tomllib = importlib.import_module("tomli")
     except ImportError:
-        tomllib = None  # type: ignore[assignment]
+        _tomllib = None
+tomllib = _tomllib
 
 try:
-    import yaml  # type: ignore[import-not-found]
+    yaml = importlib.import_module("yaml")
 except ImportError:
-    yaml = None  # type: ignore[assignment]
+    yaml = None
 
 
 # Config file search order (first found wins)

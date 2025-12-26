@@ -93,13 +93,13 @@ def detect_encoding(file_path: Path, sample_size: int = 8192) -> str:
 
         # Fall back to chardet for non-UTF-8 files
         result = chardet.detect(sample)
-        encoding = result.get("encoding")
+        encoding_any = result.get("encoding")
 
-        if encoding is None:
+        if not isinstance(encoding_any, str) or not encoding_any:
             return "utf-8"
 
         # Normalize encoding names
-        encoding = encoding.lower()
+        encoding = encoding_any.lower()
         if encoding in ("ascii", "utf-8", "utf8"):
             return "utf-8"
 

@@ -122,7 +122,7 @@ def parse_globs(value: str) -> set[str]:
     return {g.strip() for g in value.split(",") if g.strip()}
 
 
-@app.command()
+@app.command()  # type: ignore[untyped-decorator]
 def export(
     # === Input Source (mutually exclusive) ===
     path: Path | None = typer.Option(
@@ -610,7 +610,7 @@ def export(
         raise typer.Exit(1) from None
 
 
-@app.command()
+@app.command()  # type: ignore[untyped-decorator]
 def info(
     path: Path = typer.Argument(
         ...,
