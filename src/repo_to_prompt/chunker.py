@@ -20,6 +20,7 @@ from .utils import estimate_tokens, read_file_safe, stable_hash
 @dataclass
 class ChunkBoundary:
     """Represents a potential chunk boundary in source code."""
+
     line_number: int
     boundary_type: str  # "function", "class", "block", "paragraph"
     weight: float  # Higher weight = better break point
@@ -64,11 +65,13 @@ class LineBasedChunker(BaseChunker):
         for i, line in enumerate(lines):
             for pattern, weight in self.BREAK_PATTERNS:
                 if pattern.match(line):
-                    boundaries.append(ChunkBoundary(
-                        line_number=i,
-                        boundary_type="pattern",
-                        weight=weight,
-                    ))
+                    boundaries.append(
+                        ChunkBoundary(
+                            line_number=i,
+                            boundary_type="pattern",
+                            weight=weight,
+                        )
+                    )
                     break
 
         return boundaries
@@ -178,21 +181,25 @@ class MarkdownChunker(BaseChunker):
             if match:
                 # Save previous section
                 if i > current_section_start:
-                    sections.append((
-                        current_section_start,
-                        i,
-                        current_heading,
-                    ))
+                    sections.append(
+                        (
+                            current_section_start,
+                            i,
+                            current_heading,
+                        )
+                    )
                 current_section_start = i
                 current_heading = match.group(2)
 
         # Don't forget the last section
         if current_section_start < len(lines):
-            sections.append((
-                current_section_start,
-                len(lines),
-                current_heading,
-            ))
+            sections.append(
+                (
+                    current_section_start,
+                    len(lines),
+                    current_heading,
+                )
+            )
 
         # If no sections found, fall back to line-based chunking
         if not sections:
@@ -316,26 +323,32 @@ class CodeChunker(BaseChunker):
             # Check language-specific patterns
             for pattern in patterns:
                 if pattern.match(stripped):
-                    boundaries.append(ChunkBoundary(
-                        line_number=i,
-                        boundary_type="definition",
-                        weight=0.95,
-                    ))
+                    boundaries.append(
+                        ChunkBoundary(
+                            line_number=i,
+                            boundary_type="definition",
+                            weight=0.95,
+                        )
+                    )
                     break
 
             # Generic boundaries
             if stripped == "":
-                boundaries.append(ChunkBoundary(
-                    line_number=i,
-                    boundary_type="blank",
-                    weight=0.5,
-                ))
+                boundaries.append(
+                    ChunkBoundary(
+                        line_number=i,
+                        boundary_type="blank",
+                        weight=0.5,
+                    )
+                )
             elif stripped.startswith("//") or stripped.startswith("#") or stripped.startswith("/*"):
-                boundaries.append(ChunkBoundary(
-                    line_number=i,
-                    boundary_type="comment",
-                    weight=0.6,
-                ))
+                boundaries.append(
+                    ChunkBoundary(
+                        line_number=i,
+                        boundary_type="comment",
+                        weight=0.6,
+                    )
+                )
 
         return boundaries
 
@@ -354,10 +367,7 @@ class CodeChunker(BaseChunker):
         boundaries = self.find_code_boundaries(lines, file_info.language)
 
         # Group boundaries by type for smarter chunking
-        definition_lines = {
-            b.line_number for b in boundaries
-            if b.boundary_type == "definition"
-        }
+        definition_lines = {b.line_number for b in boundaries if b.boundary_type == "definition"}
 
         # Estimate tokens per line
         total_tokens = estimate_tokens(content)
@@ -420,12 +430,26 @@ class ChunkerFactory:
     """Factory for creating appropriate chunkers based on file type."""
 
     CODE_LANGUAGES = {
-        "python", "javascript", "typescript", "go", "java", "rust",
-        "c", "cpp", "csharp", "ruby", "php", "swift", "kotlin", "scala",
+        "python",
+        "javascript",
+        "typescript",
+        "go",
+        "java",
+        "rust",
+        "c",
+        "cpp",
+        "csharp",
+        "ruby",
+        "php",
+        "swift",
+        "kotlin",
+        "scala",
     }
 
     MARKDOWN_LANGUAGES = {
-        "markdown", "restructuredtext", "asciidoc",
+        "markdown",
+        "restructuredtext",
+        "asciidoc",
     }
 
     @classmethod
@@ -525,6 +549,7 @@ def coalesce_small_chunks(
 
     # Group chunks by file path to only merge within same file
     from collections import defaultdict
+
     by_file: dict[str, list[Chunk]] = defaultdict(list)
     for chunk in chunks:
         by_file[chunk.path].append(chunk)

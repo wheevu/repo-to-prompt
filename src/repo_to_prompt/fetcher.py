@@ -20,6 +20,7 @@ console = Console()
 
 class FetchError(Exception):
     """Error during repository fetching."""
+
     pass
 
 

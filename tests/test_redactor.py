@@ -1,6 +1,5 @@
 """Tests for the redactor module."""
 
-
 from repo_to_prompt.redactor import create_redactor
 
 
@@ -80,9 +79,12 @@ anotherlineofkey
         # Construct at runtime so GitHub push protection doesn't flag the literal.
         webhook = (
             "https://hooks.slack.com/services/"
-            + "T" + "00000000"
-            + "/B" + "00000000"
-            + "/" + ("X" * 24)
+            + "T"
+            + "00000000"
+            + "/B"
+            + "00000000"
+            + "/"
+            + ("X" * 24)
         )
         content = "SLACK_WEBHOOK=" + webhook
         result = redactor.redact(content)

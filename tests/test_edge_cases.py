@@ -249,8 +249,7 @@ class TestGitignorePatterns:
         """Test gitignore negation patterns (!)."""
         # Create gitignore with negation
         (temp_repo / ".gitignore").write_text(
-            "*.log\n"
-            "!important.log\n"  # Negation: don't ignore this one
+            "*.log\n!important.log\n"  # Negation: don't ignore this one
         )
 
         # Create files
@@ -329,10 +328,7 @@ class TestGitignorePatterns:
     def test_comment_handling(self, temp_repo):
         """Test that comments in .gitignore are ignored."""
         (temp_repo / ".gitignore").write_text(
-            "# This is a comment\n"
-            "*.log\n"
-            "# Another comment\n"
-            "  # Indented comment\n"
+            "# This is a comment\n*.log\n# Another comment\n  # Indented comment\n"
         )
 
         (temp_repo / "test.log").write_text("log")

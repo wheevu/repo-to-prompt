@@ -23,7 +23,9 @@ def temp_repo():
 
         # Create files
         (root / "README.md").write_text("# Test Project\n\nThis is a test.")
-        (root / "package.json").write_text('{"name": "test", "main": "src/index.js", "scripts": {"test": "jest"}}')
+        (root / "package.json").write_text(
+            '{"name": "test", "main": "src/index.js", "scripts": {"test": "jest"}}'
+        )
         (root / "src" / "index.js").write_text("export function main() {}")
         (root / "src" / "utils.js").write_text("export function helper() {}")
         (root / "tests" / "test_main.js").write_text("test('main', () => {})")
@@ -213,13 +215,13 @@ class TestEntrypointValidation:
     def test_entrypoints_validated_against_scanned_files(self, temp_repo):
         """Test that entrypoints are validated against scanned file set."""
         # Create a pyproject.toml with entrypoints pointing to non-existent files
-        (temp_repo / "pyproject.toml").write_text('''
+        (temp_repo / "pyproject.toml").write_text("""
 [project]
 name = "test"
 
 [project.scripts]
 cli = "nonexistent.module:main"
-''')
+""")
 
         # Create actual source file
         (temp_repo / "src" / "cli.py").write_text("def main(): pass")
@@ -239,12 +241,12 @@ cli = "nonexistent.module:main"
             root = Path(tmpdir)
 
             # Create pyproject with classifiers (not scripts)
-            (root / "pyproject.toml").write_text('''
+            (root / "pyproject.toml").write_text("""
 [project]
 name = "test"
 requires-python = ">=3.10"
 license = "MIT"
-''')
+""")
 
             scanned_files = {"src/main.py"}
             ranker = FileRanker(root, scanned_files=scanned_files)

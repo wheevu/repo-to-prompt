@@ -17,6 +17,7 @@ REPORT_SCHEMA_VERSION = "1.0.0"
 
 class OutputMode(str, Enum):
     """Output mode for the tool."""
+
     PROMPT = "prompt"
     RAG = "rag"
     BOTH = "both"
@@ -25,17 +26,31 @@ class OutputMode(str, Enum):
 # Default file extensions to include
 DEFAULT_INCLUDE_EXTENSIONS: set[str] = {
     # Python
-    ".py", ".pyi", ".pyx",
+    ".py",
+    ".pyi",
+    ".pyx",
     # JavaScript/TypeScript
-    ".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs",
+    ".js",
+    ".jsx",
+    ".ts",
+    ".tsx",
+    ".mjs",
+    ".cjs",
     # Go
     ".go",
     # Java/Kotlin
-    ".java", ".kt", ".kts",
+    ".java",
+    ".kt",
+    ".kts",
     # Rust
     ".rs",
     # C/C++
-    ".c", ".h", ".cpp", ".hpp", ".cc", ".cxx",
+    ".c",
+    ".h",
+    ".cpp",
+    ".hpp",
+    ".cc",
+    ".cxx",
     # C#
     ".cs",
     # Ruby
@@ -47,17 +62,34 @@ DEFAULT_INCLUDE_EXTENSIONS: set[str] = {
     # Scala
     ".scala",
     # Shell
-    ".sh", ".bash", ".zsh",
+    ".sh",
+    ".bash",
+    ".zsh",
     # Documentation
-    ".md", ".rst", ".txt", ".adoc",
+    ".md",
+    ".rst",
+    ".txt",
+    ".adoc",
     # Config
-    ".yaml", ".yml", ".toml", ".json", ".ini", ".cfg",
+    ".yaml",
+    ".yml",
+    ".toml",
+    ".json",
+    ".ini",
+    ".cfg",
     # Web
-    ".html", ".css", ".scss", ".less", ".vue", ".svelte",
+    ".html",
+    ".css",
+    ".scss",
+    ".less",
+    ".vue",
+    ".svelte",
     # SQL
     ".sql",
     # Misc
-    ".dockerfile", ".graphql", ".proto",
+    ".dockerfile",
+    ".graphql",
+    ".proto",
 }
 
 # Default glob patterns to exclude
@@ -253,8 +285,7 @@ class Config:
 
         # Normalize extensions to include leading dot
         self.include_extensions = {
-            ext if ext.startswith(".") else f".{ext}"
-            for ext in self.include_extensions
+            ext if ext.startswith(".") else f".{ext}" for ext in self.include_extensions
         }
 
 
@@ -287,7 +318,9 @@ class FileInfo:
     @property
     def is_config(self) -> bool:
         """Check if file is a config file."""
-        return self.relative_path in IMPORTANT_CONFIG_FILES or self.path.name in IMPORTANT_CONFIG_FILES
+        return (
+            self.relative_path in IMPORTANT_CONFIG_FILES or self.path.name in IMPORTANT_CONFIG_FILES
+        )
 
     @property
     def is_doc(self) -> bool:

@@ -48,6 +48,7 @@ class RedactionConfig:
     - Line-level redaction replaces entire lines with comments, preserving syntax
     - This prevents redaction placeholders from breaking code structure
     """
+
     # Custom regex patterns to add
     custom_rules: list[RedactionRule] = field(default_factory=list)
 
@@ -68,46 +69,50 @@ class RedactionConfig:
     paranoid_min_length: int = 32
 
     # Files that are "known safe" - skip paranoid mode
-    safe_file_patterns: list[str] = field(default_factory=lambda: [
-        "*.md",
-        "*.rst",
-        "*.txt",
-        "*.json",  # Often contains UUIDs, hashes that look like secrets
-        "*.lock",
-        "*.sum",
-        "go.sum",
-        "package-lock.json",
-        "yarn.lock",
-        "poetry.lock",
-        "Cargo.lock",
-    ])
+    safe_file_patterns: list[str] = field(
+        default_factory=lambda: [
+            "*.md",
+            "*.rst",
+            "*.txt",
+            "*.json",  # Often contains UUIDs, hashes that look like secrets
+            "*.lock",
+            "*.sum",
+            "go.sum",
+            "package-lock.json",
+            "yarn.lock",
+            "poetry.lock",
+            "Cargo.lock",
+        ]
+    )
 
     # Source code patterns - use structure-safe (line-level) redaction
     # By default, Python/JS/TS source files use line-level redaction to preserve syntax
-    source_safe_patterns: list[str] = field(default_factory=lambda: [
-        "*.py",
-        "*.pyi",
-        "*.js",
-        "*.jsx",
-        "*.ts",
-        "*.tsx",
-        "*.go",
-        "*.rs",
-        "*.java",
-        "*.kt",
-        "*.c",
-        "*.cpp",
-        "*.h",
-        "*.hpp",
-        "*.cs",
-        "*.rb",
-        "*.php",
-        "*.swift",
-        "*.scala",
-        "*.sh",
-        "*.bash",
-        "*.zsh",
-    ])
+    source_safe_patterns: list[str] = field(
+        default_factory=lambda: [
+            "*.py",
+            "*.pyi",
+            "*.js",
+            "*.jsx",
+            "*.ts",
+            "*.tsx",
+            "*.go",
+            "*.rs",
+            "*.java",
+            "*.kt",
+            "*.c",
+            "*.cpp",
+            "*.h",
+            "*.hpp",
+            "*.cs",
+            "*.rb",
+            "*.php",
+            "*.swift",
+            "*.scala",
+            "*.sh",
+            "*.bash",
+            "*.zsh",
+        ]
+    )
 
     # Enable structure-safe redaction for source files (default: True)
     # When True, source files use line-level redaction that preserves syntax
@@ -124,11 +129,13 @@ class RedactionConfig:
             if "pattern" in rule_data:
                 try:
                     pattern = re.compile(rule_data["pattern"])
-                    config.custom_rules.append(RedactionRule(
-                        name=rule_data.get("name", "custom"),
-                        pattern=pattern,
-                        replacement=rule_data.get("replacement", "[CUSTOM_REDACTED]"),
-                    ))
+                    config.custom_rules.append(
+                        RedactionRule(
+                            name=rule_data.get("name", "custom"),
+                            pattern=pattern,
+                            replacement=rule_data.get("replacement", "[CUSTOM_REDACTED]"),
+                        )
+                    )
                 except re.error:
                     pass  # Skip invalid patterns
 
@@ -218,14 +225,14 @@ def is_high_entropy_secret(
         return False
 
     # Must be alphanumeric with allowed special chars
-    if not re.match(r'^[A-Za-z0-9+/=_\-]+$', s):
+    if not re.match(r"^[A-Za-z0-9+/=_\-]+$", s):
         return False
 
     return calculate_entropy(s) >= threshold
 
 
 # Pattern for paranoid mode: long base64-like strings
-PARANOID_PATTERN = re.compile(r'\b([A-Za-z0-9+/=_\-]{32,})\b')
+PARANOID_PATTERN = re.compile(r"\b([A-Za-z0-9+/=_\-]{32,})\b")
 
 
 # Comprehensive list of secret patterns
@@ -246,7 +253,6 @@ SECRET_PATTERNS: list[RedactionRule] = [
         ),
         replacement=r"\1=[AWS_SECRET_REDACTED]",
     ),
-
     # GitHub
     RedactionRule(
         name="github_token",
@@ -268,14 +274,12 @@ SECRET_PATTERNS: list[RedactionRule] = [
         pattern=re.compile(r"\b(ghr_[A-Za-z0-9]{36})\b"),
         replacement="[GITHUB_REFRESH_TOKEN_REDACTED]",
     ),
-
     # GitLab
     RedactionRule(
         name="gitlab_token",
         pattern=re.compile(r"\b(glpat-[A-Za-z0-9\-_]{20,})\b"),
         replacement="[GITLAB_TOKEN_REDACTED]",
     ),
-
     # Slack
     RedactionRule(
         name="slack_token",
@@ -289,7 +293,6 @@ SECRET_PATTERNS: list[RedactionRule] = [
         ),
         replacement="[SLACK_WEBHOOK_REDACTED]",
     ),
-
     # Stripe
     RedactionRule(
         name="stripe_key",
@@ -301,28 +304,24 @@ SECRET_PATTERNS: list[RedactionRule] = [
         pattern=re.compile(r"\b(sk_test_[A-Za-z0-9]{24,})\b"),
         replacement="[STRIPE_TEST_KEY_REDACTED]",
     ),
-
     # Twilio
     RedactionRule(
         name="twilio_api_key",
         pattern=re.compile(r"\b(SK[0-9a-fA-F]{32})\b"),
         replacement="[TWILIO_KEY_REDACTED]",
     ),
-
     # SendGrid
     RedactionRule(
         name="sendgrid_key",
         pattern=re.compile(r"\b(SG\.[A-Za-z0-9\-_]{22,}\.[A-Za-z0-9\-_]{22,})\b"),
         replacement="[SENDGRID_KEY_REDACTED]",
     ),
-
     # Mailchimp
     RedactionRule(
         name="mailchimp_key",
         pattern=re.compile(r"\b([a-f0-9]{32}-us[0-9]{1,2})\b"),
         replacement="[MAILCHIMP_KEY_REDACTED]",
     ),
-
     # Google
     RedactionRule(
         name="google_api_key",
@@ -334,14 +333,12 @@ SECRET_PATTERNS: list[RedactionRule] = [
         pattern=re.compile(r"\b([0-9]+-[a-z0-9_]{32}\.apps\.googleusercontent\.com)\b"),
         replacement="[GOOGLE_OAUTH_REDACTED]",
     ),
-
     # Firebase
     RedactionRule(
         name="firebase_key",
         pattern=re.compile(r"\b(AAAA[A-Za-z0-9_-]{7,}:[A-Za-z0-9_-]{140,})\b"),
         replacement="[FIREBASE_KEY_REDACTED]",
     ),
-
     # Heroku
     RedactionRule(
         name="heroku_api_key",
@@ -350,25 +347,24 @@ SECRET_PATTERNS: list[RedactionRule] = [
         ),
         replacement=r"\1=[HEROKU_KEY_REDACTED]",
     ),
-
     # npm
     RedactionRule(
         name="npm_token",
         pattern=re.compile(r"\b(npm_[A-Za-z0-9]{36})\b"),
         replacement="[NPM_TOKEN_REDACTED]",
     ),
-
     # PyPI
     RedactionRule(
         name="pypi_token",
         pattern=re.compile(r"\b(pypi-[A-Za-z0-9\-_]{50,})\b"),
         replacement="[PYPI_TOKEN_REDACTED]",
     ),
-
     # Generic patterns
     RedactionRule(
         name="private_key_header",
-        pattern=re.compile(r"(-----BEGIN\s+(?:RSA\s+|DSA\s+|EC\s+|OPENSSH\s+)?PRIVATE\s+KEY-----[\s\S]*?-----END\s+(?:RSA\s+|DSA\s+|EC\s+|OPENSSH\s+)?PRIVATE\s+KEY-----)"),
+        pattern=re.compile(
+            r"(-----BEGIN\s+(?:RSA\s+|DSA\s+|EC\s+|OPENSSH\s+)?PRIVATE\s+KEY-----[\s\S]*?-----END\s+(?:RSA\s+|DSA\s+|EC\s+|OPENSSH\s+)?PRIVATE\s+KEY-----)"
+        ),
         replacement="[PRIVATE_KEY_REDACTED]",
     ),
     RedactionRule(
@@ -376,7 +372,6 @@ SECRET_PATTERNS: list[RedactionRule] = [
         pattern=re.compile(r"\b(eyJ[A-Za-z0-9\-_]+\.eyJ[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+)\b"),
         replacement="[JWT_TOKEN_REDACTED]",
     ),
-
     # Generic secret assignments (with common key names)
     # This pattern captures secrets in various assignment formats while preserving structure
     # Handles: key="value", key: "value", "key": "value", key = value
@@ -387,7 +382,6 @@ SECRET_PATTERNS: list[RedactionRule] = [
         ),
         replacement=r"\1\2[SECRET_REDACTED]\4",
     ),
-
     # Environment variable exports with secrets
     RedactionRule(
         name="env_secret",
@@ -396,45 +390,32 @@ SECRET_PATTERNS: list[RedactionRule] = [
         ),
         replacement=r"\1[SECRET_REDACTED]",
     ),
-
     # Connection strings with passwords
     RedactionRule(
         name="connection_string",
-        pattern=re.compile(
-            r"((?:postgres|mysql|mongodb|redis|amqp)(?:ql)?://[^:]+:)([^@]+)(@)"
-        ),
+        pattern=re.compile(r"((?:postgres|mysql|mongodb|redis|amqp)(?:ql)?://[^:]+:)([^@]+)(@)"),
         replacement=r"\1[PASSWORD_REDACTED]\3",
     ),
-
     # Basic auth in URLs
     RedactionRule(
         name="url_auth",
-        pattern=re.compile(
-            r"(https?://[^:]+:)([^@]+)(@[^\s]+)"
-        ),
+        pattern=re.compile(r"(https?://[^:]+:)([^@]+)(@[^\s]+)"),
         replacement=r"\1[PASSWORD_REDACTED]\3",
     ),
-
     # Context-based patterns (Authorization headers, env assignments)
     RedactionRule(
         name="auth_bearer",
-        pattern=re.compile(
-            r"(?i)(Authorization:\s*Bearer\s+)([A-Za-z0-9\-_./+=]{20,})"
-        ),
+        pattern=re.compile(r"(?i)(Authorization:\s*Bearer\s+)([A-Za-z0-9\-_./+=]{20,})"),
         replacement=r"\1[BEARER_TOKEN_REDACTED]",
     ),
     RedactionRule(
         name="auth_basic",
-        pattern=re.compile(
-            r"(?i)(Authorization:\s*Basic\s+)([A-Za-z0-9+/=]{20,})"
-        ),
+        pattern=re.compile(r"(?i)(Authorization:\s*Basic\s+)([A-Za-z0-9+/=]{20,})"),
         replacement=r"\1[BASIC_AUTH_REDACTED]",
     ),
     RedactionRule(
         name="x_api_key_header",
-        pattern=re.compile(
-            r"(?i)(X-API-Key:\s*)([A-Za-z0-9\-_./+=]{16,})"
-        ),
+        pattern=re.compile(r"(?i)(X-API-Key:\s*)([A-Za-z0-9\-_./+=]{16,})"),
         replacement=r"\1[API_KEY_REDACTED]",
     ),
 ]
@@ -443,15 +424,15 @@ SECRET_PATTERNS: list[RedactionRule] = [
 # Patterns commonly found in safe content (UUIDs, hashes, etc.)
 SAFE_PATTERNS = [
     # UUIDs (not secrets, just identifiers)
-    re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', re.I),
+    re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I),
     # Git commit SHAs
-    re.compile(r'^[0-9a-f]{40}$'),
+    re.compile(r"^[0-9a-f]{40}$"),
     # MD5 hashes (often used for checksums)
-    re.compile(r'^[0-9a-f]{32}$'),
+    re.compile(r"^[0-9a-f]{32}$"),
     # SHA-256 hashes
-    re.compile(r'^[0-9a-f]{64}$'),
+    re.compile(r"^[0-9a-f]{64}$"),
     # Package versions like 1.2.3-beta.4+build.567
-    re.compile(r'^\d+\.\d+\.\d+[\w\-+.]*$'),
+    re.compile(r"^\d+\.\d+\.\d+[\w\-+.]*$"),
 ]
 
 
@@ -573,8 +554,23 @@ class Redactor:
             return "#"
 
         # Languages using // for comments
-        if suffix in {".js", ".jsx", ".ts", ".tsx", ".go", ".java", ".kt", ".c", ".cpp",
-                      ".h", ".hpp", ".cs", ".swift", ".scala", ".rs"}:
+        if suffix in {
+            ".js",
+            ".jsx",
+            ".ts",
+            ".tsx",
+            ".go",
+            ".java",
+            ".kt",
+            ".c",
+            ".cpp",
+            ".h",
+            ".hpp",
+            ".cs",
+            ".swift",
+            ".scala",
+            ".rs",
+        }:
             return "//"
 
         # PHP can use both, prefer //
@@ -678,7 +674,7 @@ class Redactor:
             if not has_secret and self.config.entropy_enabled:
                 # Check for high-entropy strings in the line
                 pattern = re.compile(
-                    r'\b([A-Za-z0-9+/=_\-]{' + str(self.config.entropy_min_length) + r',})\b'
+                    r"\b([A-Za-z0-9+/=_\-]{" + str(self.config.entropy_min_length) + r",})\b"
                 )
                 for match in pattern.finditer(line):
                     value = match.group(1)
@@ -697,7 +693,7 @@ class Redactor:
 
             if not has_secret and self.config.paranoid_mode and not self._is_file_safe():
                 pattern = re.compile(
-                    r'\b([A-Za-z0-9+/=_\-]{' + str(self.config.paranoid_min_length) + r',})\b'
+                    r"\b([A-Za-z0-9+/=_\-]{" + str(self.config.paranoid_min_length) + r",})\b"
                 )
                 for match in pattern.finditer(line):
                     value = match.group(1)
@@ -729,9 +725,7 @@ class Redactor:
                 redaction_comment = f"{indent}{comment_prefix} [REDACTED: {rule_name}]{line_ending}"
                 result_lines.append(redaction_comment)
 
-                self.redaction_counts[rule_name] = (
-                    self.redaction_counts.get(rule_name, 0) + 1
-                )
+                self.redaction_counts[rule_name] = self.redaction_counts.get(rule_name, 0) + 1
             else:
                 result_lines.append(line)
 
@@ -776,9 +770,7 @@ class Redactor:
             matches = rule.pattern.findall(result)
             if matches:
                 count = len(matches) if isinstance(matches[0], str) else len(matches)
-                self.redaction_counts[rule.name] = (
-                    self.redaction_counts.get(rule.name, 0) + count
-                )
+                self.redaction_counts[rule.name] = self.redaction_counts.get(rule.name, 0) + count
                 had_redaction = True
             result = rule.pattern.sub(rule.replacement, result)
 
@@ -806,9 +798,7 @@ class Redactor:
             matches = rule.pattern.findall(result)
             if matches:
                 count = len(matches) if isinstance(matches[0], str) else len(matches)
-                self.redaction_counts[rule.name] = (
-                    self.redaction_counts.get(rule.name, 0) + count
-                )
+                self.redaction_counts[rule.name] = self.redaction_counts.get(rule.name, 0) + count
             result = rule.pattern.sub(rule.replacement, result)
 
         # Apply entropy-based detection
@@ -849,7 +839,9 @@ class Redactor:
             return match.group(0)
 
         # Find potential high-entropy strings
-        pattern = re.compile(r'\b([A-Za-z0-9+/=_\-]{' + str(self.config.entropy_min_length) + r',})\b')
+        pattern = re.compile(
+            r"\b([A-Za-z0-9+/=_\-]{" + str(self.config.entropy_min_length) + r",})\b"
+        )
         return pattern.sub(replace_high_entropy, content)
 
     def _redact_paranoid(self, content: str) -> str:
@@ -882,7 +874,7 @@ class Redactor:
             return "[LONG_TOKEN_REDACTED]"
 
         pattern = re.compile(
-            r'\b([A-Za-z0-9+/=_\-]{' + str(self.config.paranoid_min_length) + r',})\b'
+            r"\b([A-Za-z0-9+/=_\-]{" + str(self.config.paranoid_min_length) + r",})\b"
         )
         return pattern.sub(replace_long_token, content)
 
@@ -937,9 +929,7 @@ class Redactor:
 
         for rule in self.patterns:
             if rule.pattern.search(result):
-                self.redaction_counts[rule.name] = (
-                    self.redaction_counts.get(rule.name, 0) + 1
-                )
+                self.redaction_counts[rule.name] = self.redaction_counts.get(rule.name, 0) + 1
                 result = rule.pattern.sub(rule.replacement, result)
 
         # Apply advanced detection

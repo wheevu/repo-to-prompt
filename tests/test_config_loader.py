@@ -22,7 +22,7 @@ class TestConfigFileFinding:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             config_file = root / "repo-to-prompt.toml"
-            config_file.write_text('[repo-to-prompt]\nmax_tokens = 50000\n')
+            config_file.write_text("[repo-to-prompt]\nmax_tokens = 50000\n")
 
             found = find_config_file(root)
             assert found == config_file
@@ -32,7 +32,7 @@ class TestConfigFileFinding:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             config_file = root / ".repo-to-prompt.toml"
-            config_file.write_text('[repo-to-prompt]\nmax_tokens = 50000\n')
+            config_file.write_text("[repo-to-prompt]\nmax_tokens = 50000\n")
 
             found = find_config_file(root)
             assert found == config_file
@@ -42,7 +42,7 @@ class TestConfigFileFinding:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             config_file = root / ".r2p.yml"
-            config_file.write_text('max_tokens: 50000\n')
+            config_file.write_text("max_tokens: 50000\n")
 
             found = find_config_file(root)
             assert found == config_file
@@ -59,8 +59,8 @@ class TestConfigFileFinding:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             # Create multiple config files
-            (root / "repo-to-prompt.toml").write_text('[repo-to-prompt]\nmax_tokens = 1\n')
-            (root / ".r2p.yml").write_text('max_tokens: 2\n')
+            (root / "repo-to-prompt.toml").write_text("[repo-to-prompt]\nmax_tokens = 1\n")
+            (root / ".r2p.yml").write_text("max_tokens: 2\n")
 
             found = find_config_file(root)
             # repo-to-prompt.toml should be found first
@@ -75,14 +75,14 @@ class TestConfigLoading:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             config_file = root / "repo-to-prompt.toml"
-            config_file.write_text('''
+            config_file.write_text("""
 [repo-to-prompt]
 max_tokens = 50000
 chunk_tokens = 1000
 include_extensions = [".py", ".ts"]
 exclude_globs = ["dist/**", "build/**"]
 follow_symlinks = true
-''')
+""")
 
             config = load_config(root)
 
@@ -100,7 +100,7 @@ follow_symlinks = true
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             config_file = root / ".r2p.yml"
-            config_file.write_text('''
+            config_file.write_text("""
 max_tokens: 100000
 chunk_tokens: 500
 include_extensions:
@@ -108,7 +108,7 @@ include_extensions:
   - .js
 mode: rag
 redact_secrets: false
-''')
+""")
 
             config = load_config(root)
 
@@ -123,14 +123,14 @@ redact_secrets: false
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             config_file = root / "repo-to-prompt.toml"
-            config_file.write_text('''
+            config_file.write_text("""
 # Other config
 [something_else]
 foo = "bar"
 
 [repo-to-prompt]
 max_tokens = 75000
-''')
+""")
 
             config = load_config(root)
             assert config.max_tokens == 75000
@@ -140,7 +140,7 @@ max_tokens = 75000
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             config_file = root / "repo-to-prompt.toml"
-            config_file.write_text('''
+            config_file.write_text("""
 [repo-to-prompt]
 max_tokens = 50000
 
@@ -148,7 +148,7 @@ max_tokens = 50000
 readme = 1.0
 test = 0.3
 generated = 0.1
-''')
+""")
 
             config = load_config(root)
 
@@ -163,10 +163,10 @@ generated = 0.1
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             config_file = root / "repo-to-prompt.toml"
-            config_file.write_text('''
+            config_file.write_text("""
 [repo-to-prompt]
 include_extensions = ".py,.ts,.js"
-''')
+""")
 
             config = load_config(root)
             assert config.include_extensions == {".py", ".ts", ".js"}
@@ -186,7 +186,7 @@ include_extensions = ".py,.ts,.js"
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             config_file = root / "repo-to-prompt.toml"
-            config_file.write_text('this is not valid toml {{{{')
+            config_file.write_text("this is not valid toml {{{{")
 
             # Should not raise, returns empty config
             config = load_config(root)
@@ -306,11 +306,13 @@ class TestRankingWeights:
 
     def test_weights_from_dict(self):
         """Test creating weights from dictionary."""
-        weights = RankingWeights.from_dict({
-            "readme": 0.8,
-            "test": 0.4,
-            "unknown_key": 0.5,  # Should be ignored
-        })
+        weights = RankingWeights.from_dict(
+            {
+                "readme": 0.8,
+                "test": 0.4,
+                "unknown_key": 0.5,  # Should be ignored
+            }
+        )
 
         assert weights.readme == 0.8
         assert weights.test == 0.4

@@ -127,7 +127,8 @@ def export(
     # === Input Source (mutually exclusive) ===
     path: Path | None = typer.Option(
         None,
-        "--path", "-p",
+        "--path",
+        "-p",
         help="Local directory path to export.",
         exists=True,
         file_okay=False,
@@ -136,7 +137,8 @@ def export(
     ),
     repo: str | None = typer.Option(
         None,
-        "--repo", "-r",
+        "--repo",
+        "-r",
         help="GitHub repository URL to clone and export.",
     ),
     ref: str | None = typer.Option(
@@ -144,26 +146,27 @@ def export(
         "--ref",
         help="Git ref (branch/tag/SHA) when using --repo.",
     ),
-
     # === Configuration File ===
     config_file: Path | None = typer.Option(
         None,
-        "--config", "-c",
+        "--config",
+        "-c",
         help="Path to config file (repo-to-prompt.toml or .r2p.yml).",
         exists=True,
         file_okay=True,
         dir_okay=False,
     ),
-
     # === File Filtering ===
     include_ext: str | None = typer.Option(
         None,
-        "--include-ext", "-i",
+        "--include-ext",
+        "-i",
         help="Include only these extensions (comma-separated, e.g., '.py,.ts').",
     ),
     exclude_glob: str | None = typer.Option(
         None,
-        "--exclude-glob", "-e",
+        "--exclude-glob",
+        "-e",
         help="Exclude paths matching these globs (comma-separated, e.g., 'dist/**').",
     ),
     max_file_bytes: int | None = typer.Option(
@@ -191,14 +194,13 @@ def export(
         "--include-minified",
         help="Include minified/bundled files. [default: skip]",
     ),
-
     # === Token Budget ===
     max_tokens: int | None = typer.Option(
         None,
-        "--max-tokens", "-t",
+        "--max-tokens",
+        "-t",
         help="Maximum tokens in output. Packs best content under this budget.",
     ),
-
     # === Chunking Options ===
     chunk_tokens: int | None = typer.Option(
         None,
@@ -215,16 +217,17 @@ def export(
         "--min-chunk-tokens",
         help="Coalesce chunks smaller than this. Set 0 to disable. [default: 200]",
     ),
-
     # === Output Options ===
     mode: OutputMode | None = typer.Option(
         None,
-        "--mode", "-m",
+        "--mode",
+        "-m",
         help="Output format: 'prompt' (Markdown), 'rag' (JSONL), or 'both'. [default: both]",
     ),
     output_dir: Path | None = typer.Option(
         None,
-        "--output-dir", "-o",
+        "--output-dir",
+        "-o",
         help="Directory for output files. [default: ./out]",
     ),
     no_timestamp: bool = typer.Option(
@@ -232,25 +235,23 @@ def export(
         "--no-timestamp",
         help="Omit timestamps from output for reproducible diffs.",
     ),
-
     # === Display Options ===
     tree_depth: int | None = typer.Option(
         None,
         "--tree-depth",
         help="Max depth for directory tree in output. [default: 4]",
     ),
-
     # === Security Options ===
     no_redact: bool = typer.Option(
         False,
         "--no-redact",
         help="Disable automatic secret/credential redaction.",
     ),
-
     # === Misc ===
     version: bool = typer.Option(
         False,
-        "--version", "-v",
+        "--version",
+        "-v",
         callback=version_callback,
         is_eager=True,
         help="Show version and exit.",
@@ -383,7 +384,9 @@ def export(
                     console.print("[yellow]Warning: No files found matching criteria.[/yellow]")
                     raise typer.Exit(0)
 
-                console.print(f"[green]✓[/green] Found {len(files)} files ({stats.files_scanned} scanned)")
+                console.print(
+                    f"[green]✓[/green] Found {len(files)} files ({stats.files_scanned} scanned)"
+                )
 
                 # Phase 2: Rank files (with progress)
                 with create_spinner_progress() as progress:
@@ -392,7 +395,9 @@ def export(
                     ranker = FileRanker(
                         repo_path,
                         scanned_files=scanned_paths,
-                        weights=m_ranking_weights.to_dict() if hasattr(m_ranking_weights, 'to_dict') else None,
+                        weights=m_ranking_weights.to_dict()
+                        if hasattr(m_ranking_weights, "to_dict")
+                        else None,
                     )
                     files = ranker.rank_files(files)
                     progress.update(task, description="[green]✓[/green] Files ranked")
@@ -525,7 +530,9 @@ def export(
                     "chunk_tokens": m_chunk_tokens,
                     "exclude_globs": sorted(m_exclude_globs) if m_exclude_globs else None,
                     "follow_symlinks": m_follow_symlinks,
-                    "include_extensions": sorted(m_include_extensions) if m_include_extensions else None,
+                    "include_extensions": sorted(m_include_extensions)
+                    if m_include_extensions
+                    else None,
                     "max_file_bytes": m_max_file_bytes,
                     "max_tokens": m_max_tokens,
                     "max_total_bytes": m_max_total_bytes,
@@ -589,9 +596,7 @@ def export(
                     for df in dropped_files[:5]:
                         console.print(f"  {df['path']} ({df['reason']})")
                     if len(dropped_files) > 5:
-                        console.print(
-                            f"  ... and {len(dropped_files) - 5} more (see report.json)"
-                        )
+                        console.print(f"  ... and {len(dropped_files) - 5} more (see report.json)")
 
     except FetchError as e:
         console.print(f"[red]Error fetching repository: {e}[/red]")
@@ -600,6 +605,7 @@ def export(
         console.print(f"[red]Error: {e}[/red]")
         if "--verbose" in sys.argv:
             import traceback
+
             console.print(traceback.format_exc())
         raise typer.Exit(1) from None
 
@@ -616,12 +622,14 @@ def info(
     ),
     include_ext: str | None = typer.Option(
         None,
-        "--include-ext", "-i",
+        "--include-ext",
+        "-i",
         help="Include only these extensions (comma-separated).",
     ),
     exclude_glob: str | None = typer.Option(
         None,
-        "--exclude-glob", "-e",
+        "--exclude-glob",
+        "-e",
         help="Exclude paths matching these globs (comma-separated).",
     ),
     max_file_bytes: int = typer.Option(
@@ -702,6 +710,7 @@ def info(
 def main() -> None:
     """Entry point for the CLI."""
     app()
+
 
 if __name__ == "__main__":
     main()

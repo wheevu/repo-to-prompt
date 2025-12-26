@@ -1,6 +1,5 @@
 """Tests for the chunker module."""
 
-
 from repo_to_prompt.chunker import (
     ChunkerFactory,
     CodeChunker,
@@ -195,7 +194,7 @@ class MyClass:
 
     def test_chunks_javascript_by_functions(self):
         """Test that JavaScript code is chunked appropriately."""
-        content = '''function greet(name) {
+        content = """function greet(name) {
     console.log("Hello, " + name);
 }
 
@@ -218,7 +217,7 @@ export function main() {
     const calc = new Calculator();
     calc.add(5);
 }
-'''
+"""
 
         chunks = chunk_content(
             content=content,

@@ -75,7 +75,9 @@ class TestDetectEncoding:
 
     def test_utf8_file(self):
         """Test detection of UTF-8 file."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False, encoding="utf-8") as f:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".txt", delete=False, encoding="utf-8"
+        ) as f:
             f.write("Hello, World! 你好世界")
             f.flush()
 
@@ -113,7 +115,9 @@ class TestReadFileSafe:
 
     def test_read_utf8_file(self):
         """Test reading UTF-8 file."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False, encoding="utf-8") as f:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".txt", delete=False, encoding="utf-8"
+        ) as f:
             f.write("Hello, World!")
             f.flush()
 
@@ -122,7 +126,9 @@ class TestReadFileSafe:
 
     def test_read_with_max_bytes(self):
         """Test reading with byte limit."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False, encoding="utf-8") as f:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".txt", delete=False, encoding="utf-8"
+        ) as f:
             f.write("A" * 1000)
             f.flush()
 

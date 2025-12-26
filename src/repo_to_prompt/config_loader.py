@@ -134,6 +134,7 @@ class ProjectConfig:
     def get_redaction_config(self) -> RedactionConfig:
         """Get the RedactionConfig object from config data."""
         from repo_to_prompt.redactor import RedactionConfig
+
         return RedactionConfig.from_dict(self.redaction_config)
 
     def to_dict(self) -> dict[str, Any]:
@@ -227,8 +228,7 @@ def _parse_yaml(path: Path) -> dict[str, Any]:
     """Parse a YAML config file."""
     if yaml is None:
         raise ImportError(
-            "YAML support requires 'pyyaml' package. "
-            "Install with: pip install pyyaml"
+            "YAML support requires 'pyyaml' package. Install with: pip install pyyaml"
         )
 
     with open(path, encoding="utf-8") as f:
@@ -319,7 +319,9 @@ def load_config(repo_root: Path, config_path: Path | None = None) -> ProjectConf
     config = ProjectConfig(_config_file=config_path)
 
     # File filtering
-    config.include_extensions = _normalize_extensions(data.get("include_extensions") or data.get("include_ext"))
+    config.include_extensions = _normalize_extensions(
+        data.get("include_extensions") or data.get("include_ext")
+    )
     config.exclude_globs = _normalize_globs(data.get("exclude_globs") or data.get("exclude_glob"))
 
     if "max_file_bytes" in data:

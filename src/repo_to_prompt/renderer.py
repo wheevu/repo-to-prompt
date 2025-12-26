@@ -111,10 +111,7 @@ class ContextPackRenderer:
         readme_content = ""
         if self._readme_files:
             with contextlib.suppress(Exception):
-                readme_content, _ = read_file_safe(
-                    self._readme_files[0].path,
-                    max_bytes=4000
-                )
+                readme_content, _ = read_file_safe(self._readme_files[0].path, max_bytes=4000)
 
         # Project info from manifests
         manifest_info = self.ranker.get_manifest_info()
@@ -149,7 +146,11 @@ class ContextPackRenderer:
             lines.append("\n**Available Commands:**")
             for cmd in ["build", "test", "start", "dev", "lint"]:
                 if cmd in scripts:
-                    lines.append(f"- `{cmd}`: `{scripts[cmd][:60]}...`" if len(scripts[cmd]) > 60 else f"- `{cmd}`: `{scripts[cmd]}`")
+                    lines.append(
+                        f"- `{cmd}`: `{scripts[cmd][:60]}...`"
+                        if len(scripts[cmd]) > 60
+                        else f"- `{cmd}`: `{scripts[cmd]}`"
+                    )
 
         # README excerpt
         if readme_content:
@@ -178,10 +179,7 @@ class ContextPackRenderer:
     def _render_tree(self) -> str:
         """Render the directory tree section."""
         # Highlight important files
-        important_files = {
-            f.relative_path for f in self.files
-            if f.priority >= 0.8
-        }
+        important_files = {f.relative_path for f in self.files if f.priority >= 0.8}
 
         tree = generate_tree(
             self.root_path,
@@ -230,10 +228,7 @@ class ContextPackRenderer:
             files_by_lang[f.language].append(f)
 
         # Sort languages by file count
-        sorted_langs = sorted(
-            files_by_lang.items(),
-            key=lambda x: -len(x[1])
-        )
+        sorted_langs = sorted(files_by_lang.items(), key=lambda x: -len(x[1]))
 
         for lang, lang_files in sorted_langs[:5]:
             if lang in ("text", "markdown"):
@@ -273,10 +268,7 @@ class ContextPackRenderer:
 
         # Sort files by priority (from the original file list)
         file_priorities = {f.relative_path: f.priority for f in self.files}
-        sorted_files = sorted(
-            chunks_by_file.keys(),
-            key=lambda p: (-file_priorities.get(p, 0), p)
-        )
+        sorted_files = sorted(chunks_by_file.keys(), key=lambda p: (-file_priorities.get(p, 0), p))
 
         total_tokens = 0
 
@@ -287,20 +279,22 @@ class ContextPackRenderer:
             file_chunks.sort(key=lambda c: c.start_line)
 
             # Get file info
-            file_info = next(
-                (f for f in self.files if f.relative_path == file_path),
-                None
-            )
+            file_info = next((f for f in self.files if f.relative_path == file_path), None)
 
             lang = file_chunks[0].language if file_chunks else "text"
             priority = file_info.priority if file_info else 0.5
 
             lines.append(f"\n### `{file_path}`")
-            lines.append(f"*Priority: {priority:.0%} | Language: {lang} | Chunks: {len(file_chunks)}*")
+            lines.append(
+                f"*Priority: {priority:.0%} | Language: {lang} | Chunks: {len(file_chunks)}*"
+            )
 
             for chunk in file_chunks:
                 # Check token budget
-                if self.max_total_tokens and total_tokens + chunk.token_estimate > self.max_total_tokens:
+                if (
+                    self.max_total_tokens
+                    and total_tokens + chunk.token_estimate > self.max_total_tokens
+                ):
                     lines.append("\n*[Content truncated due to token limit]*")
                     return "\n".join(lines)
 
@@ -514,7 +508,9 @@ def write_outputs(
     # Write report (after other files so we can include them)
     report_path = output_dir / "report.json"
     report_renderer = ReportRenderer(
-        stats, config, output_files,
+        stats,
+        config,
+        output_files,
         include_timestamp=include_timestamp,
         files=files,
     )

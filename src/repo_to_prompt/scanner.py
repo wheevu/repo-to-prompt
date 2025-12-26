@@ -30,6 +30,7 @@ from .utils import is_binary_file, is_likely_minified, normalize_path
 
 class FileCacheKey(NamedTuple):
     """Cache key based on path, mtime, and size."""
+
     path: str
     mtime_ns: int
     size: int
@@ -230,16 +231,10 @@ class GitIgnoreParser:
                 patterns = f.read().splitlines()
 
             # Filter out comments and empty lines, preserve negation patterns
-            patterns = [
-                p.strip() for p in patterns
-                if p.strip() and not p.strip().startswith("#")
-            ]
+            patterns = [p.strip() for p in patterns if p.strip() and not p.strip().startswith("#")]
 
             if patterns:
-                self._specs[base_path] = pathspec.PathSpec.from_lines(
-                    GitWildMatchPattern,
-                    patterns
-                )
+                self._specs[base_path] = pathspec.PathSpec.from_lines(GitWildMatchPattern, patterns)
         except Exception:
             pass  # Ignore unreadable .gitignore files
 
@@ -267,9 +262,7 @@ class GitIgnoreParser:
         # Fall back to pathspec matching
         # Check each .gitignore from most specific to least
         for base_path, spec in sorted(
-            self._specs.items(),
-            key=lambda x: len(x[0].parts),
-            reverse=True
+            self._specs.items(), key=lambda x: len(x[0].parts), reverse=True
         ):
             try:
                 rel_path = file_path.relative_to(base_path)
@@ -329,8 +322,14 @@ class FileScanner:
             use_cache: Whether to use file cache for binary/minified checks (default: True)
         """
         self.root_path = root_path.resolve()
-        self.include_extensions = include_extensions if include_extensions is not None else DEFAULT_INCLUDE_EXTENSIONS.copy()
-        self.exclude_globs = exclude_globs if exclude_globs is not None else DEFAULT_EXCLUDE_GLOBS.copy()
+        self.include_extensions = (
+            include_extensions
+            if include_extensions is not None
+            else DEFAULT_INCLUDE_EXTENSIONS.copy()
+        )
+        self.exclude_globs = (
+            exclude_globs if exclude_globs is not None else DEFAULT_EXCLUDE_GLOBS.copy()
+        )
         self.max_file_bytes = max_file_bytes
         self.respect_gitignore = respect_gitignore
         self.follow_symlinks = follow_symlinks
@@ -349,8 +348,7 @@ class FileScanner:
 
         # Compile exclude patterns using pathspec for consistency
         self._exclude_spec = pathspec.PathSpec.from_lines(
-            GitWildMatchPattern,
-            list(self.exclude_globs)
+            GitWildMatchPattern, list(self.exclude_globs)
         )
 
         # Statistics tracking
@@ -384,8 +382,13 @@ class FileScanner:
         # Handle files without extension but with known names
         if not ext:
             known_extensionless = {
-                "makefile", "dockerfile", "rakefile", "gemfile",
-                "procfile", "vagrantfile", "jenkinsfile",
+                "makefile",
+                "dockerfile",
+                "rakefile",
+                "gemfile",
+                "procfile",
+                "vagrantfile",
+                "jenkinsfile",
             }
             return name in known_extensionless
 
@@ -571,7 +574,9 @@ class FileScanner:
         # Phase 2: Check binary/minified concurrently
         total = len(candidates)
 
-        def check_file(idx: int, file_path: Path, rel_path: str, size: int) -> tuple[int, tuple[Path, str, int] | None]:
+        def check_file(
+            idx: int, file_path: Path, rel_path: str, size: int
+        ) -> tuple[int, tuple[Path, str, int] | None]:
             """Check a single file for binary/minified status."""
             # Check if binary (with caching)
             is_binary = None
@@ -712,7 +717,13 @@ class FileScanner:
                                     continue
 
                                 # Quick check for obvious excludes
-                                if entry.name in {"node_modules", "__pycache__", ".git", ".venv", "venv"}:
+                                if entry.name in {
+                                    "node_modules",
+                                    "__pycache__",
+                                    ".git",
+                                    ".venv",
+                                    "venv",
+                                }:
                                     continue
 
                                 dirs_to_add.append(entry_path)
@@ -729,6 +740,7 @@ class FileScanner:
 
             except (OSError, PermissionError):
                 continue
+
 
 def scan_repository(
     root_path: Path,
@@ -807,8 +819,16 @@ def generate_tree(
             if entry.name.startswith(".") and entry.name not in {".github", ".env.example"}:
                 continue
             if entry.is_dir() and entry.name in {
-                "node_modules", "__pycache__", ".git", "venv", ".venv",
-                "dist", "build", "target", ".tox", ".eggs"
+                "node_modules",
+                "__pycache__",
+                ".git",
+                "venv",
+                ".venv",
+                "dist",
+                "build",
+                "target",
+                ".tox",
+                ".eggs",
             }:
                 continue
             filtered_entries.append(entry)

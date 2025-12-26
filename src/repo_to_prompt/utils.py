@@ -17,6 +17,7 @@ import chardet
 _tiktoken_encoder = None
 try:
     import tiktoken
+
     _tiktoken_encoder = tiktoken.get_encoding("cl100k_base")
 except ImportError:
     pass
@@ -128,7 +129,8 @@ def is_binary_file(file_path: Path, sample_size: int = 8192) -> bool:
         # Check for high ratio of non-text bytes
         # Text files typically have >70% printable ASCII
         printable_count = sum(
-            1 for b in sample
+            1
+            for b in sample
             if 32 <= b <= 126 or b in (9, 10, 13)  # printable + tab, newline, CR
         )
 
@@ -139,9 +141,7 @@ def is_binary_file(file_path: Path, sample_size: int = 8192) -> bool:
 
 
 def read_file_safe(
-    file_path: Path,
-    max_bytes: int | None = None,
-    encoding: str | None = None
+    file_path: Path, max_bytes: int | None = None, encoding: str | None = None
 ) -> tuple[str, str]:
     """
     Safely read a file with encoding detection and error handling.
@@ -201,10 +201,7 @@ def read_file_safe(
 
 
 def stream_file_lines(
-    file_path: Path,
-    encoding: str | None = None,
-    start_line: int = 1,
-    end_line: int | None = None
+    file_path: Path, encoding: str | None = None, start_line: int = 1, end_line: int | None = None
 ) -> list[str]:
     """
     Stream specific lines from a file without loading the entire file.
@@ -261,7 +258,7 @@ def truncate_string(s: str, max_length: int, suffix: str = "...") -> str:
     """Truncate a string to max length, adding suffix if truncated."""
     if len(s) <= max_length:
         return s
-    return s[:max_length - len(suffix)] + suffix
+    return s[: max_length - len(suffix)] + suffix
 
 
 # Common patterns for detecting generated/vendored files
@@ -376,13 +373,16 @@ def is_vendored(file_path: Path) -> bool:
     """Check if a file appears to be vendored/third-party."""
     # Normalize path for cross-platform compatibility
     path_str = normalize_path(str(file_path)).lower()
-    return any(d in path_str for d in [
-        "vendor/",
-        "vendors/",
-        "third_party/",
-        "third-party/",
-        "thirdparty/",
-        "external/",
-        "extern/",
-        "node_modules/",
-    ])
+    return any(
+        d in path_str
+        for d in [
+            "vendor/",
+            "vendors/",
+            "third_party/",
+            "third-party/",
+            "thirdparty/",
+            "external/",
+            "extern/",
+            "node_modules/",
+        ]
+    )

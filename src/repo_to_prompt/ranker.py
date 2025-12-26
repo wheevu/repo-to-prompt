@@ -309,7 +309,15 @@ class FileRanker:
             return self.WEIGHTS["entrypoint"]
 
         # Check common entrypoint names
-        if name_lower in {"main.py", "main.go", "main.rs", "index.js", "index.ts", "app.py", "cli.py"}:
+        if name_lower in {
+            "main.py",
+            "main.go",
+            "main.rs",
+            "index.js",
+            "index.ts",
+            "app.py",
+            "cli.py",
+        }:
             return self.WEIGHTS["entrypoint"]
 
         # Check for tests

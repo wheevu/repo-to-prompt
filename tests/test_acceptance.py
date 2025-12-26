@@ -166,14 +166,13 @@ BOX = "├── item"
         (tmp_path / "src").mkdir()
 
         readme = tmp_path / "README.md"
-        readme_content = "# Test Project 🎉\n\nThis is a test\u2026 with smart \u201cquotes\u201d.\n"
+        readme_content = (
+            "# Test Project 🎉\n\nThis is a test\u2026 with smart \u201cquotes\u201d.\n"
+        )
         readme.write_text(readme_content, encoding="utf-8")
 
         code = tmp_path / "src" / "main.py"
-        code.write_text(
-            '"""Main module."""\nMESSAGE = "Hello\u2026 🌍"\n',
-            encoding="utf-8"
-        )
+        code.write_text('"""Main module."""\nMESSAGE = "Hello\u2026 🌍"\n', encoding="utf-8")
 
         # Run the pipeline
         files, stats = scan_repository(tmp_path)
@@ -239,15 +238,12 @@ class TestContextPackCodeValidity:
         blocks = []
 
         # Match fenced code blocks with python/py language
-        pattern = re.compile(
-            r'^```(?:python|py)\s*\n(.*?)^```',
-            re.MULTILINE | re.DOTALL
-        )
+        pattern = re.compile(r"^```(?:python|py)\s*\n(.*?)^```", re.MULTILINE | re.DOTALL)
 
         for match in pattern.finditer(markdown):
             code = match.group(1)
             # Calculate line number
-            line_num = markdown[:match.start()].count('\n') + 1
+            line_num = markdown[: match.start()].count("\n") + 1
             blocks.append((code, line_num))
 
         return blocks
@@ -258,7 +254,8 @@ class TestContextPackCodeValidity:
         (tmp_path / "src").mkdir()
 
         # Simple module
-        (tmp_path / "src" / "simple.py").write_text('''
+        (tmp_path / "src" / "simple.py").write_text(
+            '''
 """Simple module."""
 
 def hello(name: str = "World") -> str:
@@ -273,16 +270,21 @@ class Greeter:
 
     def greet(self, name: str) -> str:
         return f"{self.prefix}, {name}!"
-''', encoding="utf-8")
+''',
+            encoding="utf-8",
+        )
 
         # Module with potential secret patterns
-        (tmp_path / "src" / "config.py").write_text('''
+        (tmp_path / "src" / "config.py").write_text(
+            '''
 """Config module."""
 
 # These look like secrets but are test values
 DATABASE_URL = "postgres://user:password@localhost/db"
 API_KEY = "test_key_12345678901234567890"
-''', encoding="utf-8")
+''',
+            encoding="utf-8",
+        )
 
         # Run pipeline
         files, stats = scan_repository(tmp_path)
@@ -325,20 +327,20 @@ API_KEY = "test_key_12345678901234567890"
             try:
                 ast.parse(code)
             except SyntaxError as e:
-                failures.append({
-                    "line": line_num,
-                    "error": str(e),
-                    "code_preview": code[:200] + "..." if len(code) > 200 else code,
-                })
+                failures.append(
+                    {
+                        "line": line_num,
+                        "error": str(e),
+                        "code_preview": code[:200] + "..." if len(code) > 200 else code,
+                    }
+                )
 
         if failures:
             failure_msg = "\n\n".join(
                 f"Line {f['line']}: {f['error']}\nCode:\n{f['code_preview']}"
                 for f in failures[:5]  # Show first 5 failures
             )
-            pytest.fail(
-                f"Found {len(failures)} unparsable Python code blocks:\n\n{failure_msg}"
-            )
+            pytest.fail(f"Found {len(failures)} unparsable Python code blocks:\n\n{failure_msg}")
 
     def test_redacted_code_still_parses(self, tmp_path: Path):
         """Code with redacted secrets must still parse."""
@@ -373,14 +375,14 @@ config = {
             ast.parse(redacted_content)
         except SyntaxError as e:
             pytest.fail(
-                f"Redacted content doesn't parse:\n"
-                f"Error: {e}\n"
-                f"Content:\n{redacted_content}"
+                f"Redacted content doesn't parse:\nError: {e}\nContent:\n{redacted_content}"
             )
 
         # Verify secrets were redacted
         assert "AKIAIOSFODNN7EXAMPLE" not in redacted_content, "AWS key should be redacted"
-        assert "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" not in redacted_content, "GitHub token should be redacted"
+        assert "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" not in redacted_content, (
+            "GitHub token should be redacted"
+        )
 
     def test_complex_code_structures_survive_redaction(self, tmp_path: Path):
         """Complex code structures must remain valid after redaction."""
@@ -509,16 +511,17 @@ class TestEndToEndIntegrity:
             try:
                 ast.parse(redacted)
             except SyntaxError as e:
-                failures.append({
-                    "file": py_file.name,
-                    "error": str(e),
-                    "preview": redacted[:200],
-                })
+                failures.append(
+                    {
+                        "file": py_file.name,
+                        "error": str(e),
+                        "preview": redacted[:200],
+                    }
+                )
 
         if failures:
             msg = "\n\n".join(
-                f"{f['file']}: {f['error']}\nPreview: {f['preview']}"
-                for f in failures[:3]
+                f"{f['file']}: {f['error']}\nPreview: {f['preview']}" for f in failures[:3]
             )
             pytest.fail(f"Redaction broke syntax in {len(failures)} files:\n\n{msg}")
 

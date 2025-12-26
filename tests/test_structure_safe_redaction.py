@@ -33,11 +33,11 @@ class TestStructureSafeRedaction:
         redactor = Redactor(config=config, current_file=Path("src/main.py"))
 
         # Code with a secret in an assignment
-        code = '''
+        code = """
 def connect():
     api_key = "mytestapikey12345678901234567890ab"
     return Client(api_key)
-'''
+"""
         result = redactor.redact(code)
 
         # The result should still be valid Python
@@ -73,14 +73,14 @@ def authenticate(token="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"):
         redactor = Redactor(config=config, current_file=Path("module.py"))
 
         # This shouldn't have secrets, but test anyway
-        code = '''
+        code = """
 from some_module import (
     SomeClass,
     another_function,
 )
 
 import os
-'''
+"""
         result = redactor.redact(code)
 
         # Must still parse
@@ -94,10 +94,10 @@ import os
         config = RedactionConfig()
         redactor = Redactor(config=config, current_file=Path("config.py"))
 
-        code = '''
+        code = """
 DATABASE_URL = "postgres://user:mysupersecretpassword123@host:5432/db"
 DEBUG = True
-'''
+"""
         result = redactor.redact(code)
 
         # Must parse
@@ -136,12 +136,12 @@ OTHER_VAR = 42
         config = RedactionConfig()
         redactor = Redactor(config=config, current_file=Path("settings.py"))
 
-        code = '''
+        code = """
 AWS_CONFIG = {
     "access_key": "AKIAIOSFODNN7EXAMPLE",
     "region": "us-west-2",
 }
-'''
+"""
         result = redactor.redact(code)
 
         # Must parse
@@ -219,13 +219,13 @@ if __name__ == "__main__":
         )
         redactor = Redactor(config=config, current_file=Path("crypto.py"))
 
-        code = '''
+        code = """
 # High entropy string that might be a secret
 RANDOM_TOKEN = "xK9fP2mN7qR4sT6vW8yB3dF5gH1jL0aZ"
 
 def process():
     return RANDOM_TOKEN
-'''
+"""
         result = redactor.redact(code)
 
         # Must parse
@@ -239,13 +239,13 @@ def process():
         )
         redactor = Redactor(config=config, current_file=Path("tokens.py"))
 
-        code = '''
+        code = """
 # Long token
 LONG_TOKEN = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnop"
 
 def get_token():
     return LONG_TOKEN
-'''
+"""
         result = redactor.redact(code)
 
         # Must parse
@@ -256,14 +256,14 @@ def get_token():
         config = RedactionConfig()
         redactor = Redactor(config=config, current_file=Path("config.js"))
 
-        code = '''
+        code = """
 const config = {
     apiKey: "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
     region: "us-west-2"
 };
 
 module.exports = config;
-'''
+"""
         result = redactor.redact(code)
 
         # Secret should be gone
@@ -281,7 +281,7 @@ module.exports = config;
         config = RedactionConfig()
         redactor = Redactor(config=config, current_file=Path("app.ts"))
 
-        code = '''
+        code = """
 interface Config {
     apiKey: string;
 }
@@ -289,7 +289,7 @@ interface Config {
 const config: Config = {
     apiKey: "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 };
-'''
+"""
         result = redactor.redact(code)
 
         # Secret should be gone
@@ -307,10 +307,10 @@ const config: Config = {
         config = RedactionConfig()
         redactor = Redactor(config=config, current_file=Path(".env"))
 
-        content = '''
+        content = """
 API_KEY=mytestapikey12345678901234567890ab
 DATABASE_URL=postgres://user:password123456789012@host/db
-'''
+"""
         result = redactor.redact(content)
 
         # Should have inline replacement tokens
@@ -324,7 +324,7 @@ DATABASE_URL=postgres://user:password123456789012@host/db
         config = RedactionConfig()
         redactor = Redactor(config=config, current_file=Path("README.md"))
 
-        content = '''
+        content = """
 # Setup
 
 Set your API key:
@@ -332,7 +332,7 @@ Set your API key:
 ```
 export API_KEY=mytestapikey12345678901234567890ab
 ```
-'''
+"""
         result = redactor.redact(content)
 
         # Should have inline replacement
@@ -347,12 +347,12 @@ class TestRedactionPreservesLineCount:
         config = RedactionConfig()
         redactor = Redactor(config=config, current_file=Path("test.py"))
 
-        code = '''line 1
+        code = """line 1
 line 2 with api_key = "mytestapikey12345678901234567890ab"
 line 3
 line 4 with github_token = "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 line 5
-'''
+"""
         original_lines = len(code.splitlines())
         result = redactor.redact(code)
         result_lines = len(result.splitlines())
@@ -385,68 +385,86 @@ class TestRegressionSyntaxIntegrity:
         # Representative Python code samples that might contain secrets
         samples = [
             # Simple assignment
-            ('simple.py', 'API_KEY = "mytestapikey12345678901234567890ab"'),
-
+            ("simple.py", 'API_KEY = "mytestapikey12345678901234567890ab"'),
             # Function with default arg - this is the critical case
-            ('func.py', '''
+            (
+                "func.py",
+                """
 def connect(token="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"):
     return Client(token)
-'''),
-
+""",
+            ),
             # Class with secrets
-            ('class.py', '''
+            (
+                "class.py",
+                """
 class Config:
     API_KEY = "mytestapikey12345678901234567890ab"
 
     def __init__(self):
         self.password = "mypassword123456789012345"
-'''),
-
+""",
+            ),
             # Dict literal
-            ('dict.py', '''
+            (
+                "dict.py",
+                """
 config = {
     "api_key": "mytestapikey12345678901234567890ab",
     "password": "mysecretpassword123456",
 }
-'''),
-
+""",
+            ),
             # F-string - use api_key to ensure pattern match
-            ('fstring.py', '''
+            (
+                "fstring.py",
+                """
 api_key = "mytestapikey12345678901234567890ab"
 msg = f"Using key: {api_key}"
-'''),
-
+""",
+            ),
             # Decorator
-            ('decorator.py', '''
+            (
+                "decorator.py",
+                """
 @require_auth("ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
 def protected():
     pass
-'''),
-
+""",
+            ),
             # Comprehension - note: comprehension with f-string won't match patterns
-            ('comp.py', '''
+            (
+                "comp.py",
+                """
 keys = [f"key_{i}" for i in range(10)]
-'''),
-
+""",
+            ),
             # Lambda - use GitHub token which has specific pattern
-            ('lambda.py', '''
+            (
+                "lambda.py",
+                """
 get_token = lambda: "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-'''),
-
+""",
+            ),
             # Try/except - use api_key for pattern match
-            ('try.py', '''
+            (
+                "try.py",
+                """
 try:
     api_key = "mytestapikey12345678901234567890ab"
     connect(api_key)
 except Exception:
     pass
-'''),
-
+""",
+            ),
             # Context manager
-            ('context.py', '''
+            (
+                "context.py",
+                """
 with Client("ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx") as client:
     client.request()
-'''),
+""",
+            ),
         ]
 
         for filename, code in samples:
@@ -474,10 +492,10 @@ with Client("ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx") as client:
         )
         redactor = Redactor(config=config, current_file=Path("test_auth.py"))
 
-        code = '''
+        code = """
 # Test with real-looking token
 TOKEN = "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-'''
+"""
         result = redactor.redact(code)
 
         # Should be unchanged
@@ -491,9 +509,9 @@ TOKEN = "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
         config = RedactionConfig(structure_safe_redaction=False)
         redactor = Redactor(config=config, current_file=Path("test.py"))
 
-        code = '''
+        code = """
 API_KEY = "mytestapikey12345678901234567890ab"
-'''
+"""
         result = redactor.redact(code)
 
         # Should have inline replacement
@@ -506,16 +524,19 @@ API_KEY = "mytestapikey12345678901234567890ab"
 class TestInlineReplacementForSourceFiles:
     """Test that source files use inline replacement correctly."""
 
-    @pytest.mark.parametrize("filename,expected_token", [
-        ("main.py", "[SECRET_REDACTED]"),
-        ("app.js", "[SECRET_REDACTED]"),
-        ("component.tsx", "[SECRET_REDACTED]"),
-        ("lib.go", "[SECRET_REDACTED]"),
-        ("Main.java", "[SECRET_REDACTED]"),
-        ("util.rs", "[SECRET_REDACTED]"),
-        ("helper.rb", "[SECRET_REDACTED]"),
-        ("script.sh", "[SECRET_REDACTED]"),
-    ])
+    @pytest.mark.parametrize(
+        "filename,expected_token",
+        [
+            ("main.py", "[SECRET_REDACTED]"),
+            ("app.js", "[SECRET_REDACTED]"),
+            ("component.tsx", "[SECRET_REDACTED]"),
+            ("lib.go", "[SECRET_REDACTED]"),
+            ("Main.java", "[SECRET_REDACTED]"),
+            ("util.rs", "[SECRET_REDACTED]"),
+            ("helper.rb", "[SECRET_REDACTED]"),
+            ("script.sh", "[SECRET_REDACTED]"),
+        ],
+    )
     def test_inline_replacement_by_language(self, filename, expected_token):
         """Source files should use inline replacement with correct tokens."""
         config = RedactionConfig()
@@ -531,4 +552,3 @@ class TestInlineReplacementForSourceFiles:
 
         # Structure preserved
         assert "api_key" in result
-

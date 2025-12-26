@@ -68,7 +68,9 @@ test-cli = "test_project.cli:main"
 """)
 
     # Main source files
-    (root / "src" / "__init__.py").write_text('"""Test project package."""\n__version__ = "1.0.0"\n')
+    (root / "src" / "__init__.py").write_text(
+        '"""Test project package."""\n__version__ = "1.0.0"\n'
+    )
 
     (root / "src" / "main.py").write_text('''"""Main module."""
 
@@ -408,7 +410,11 @@ class TestFixtureRepoOutput:
             stats.chunks_created = len(all_chunks)
 
             context_pack = render_context_pack(
-                fixture_repo, files, all_chunks, ranker, stats,
+                fixture_repo,
+                files,
+                all_chunks,
+                ranker,
+                stats,
                 include_timestamp=False,
             )
 

@@ -53,6 +53,7 @@ class TestDeterministicOutput:
 
     def test_context_pack_is_deterministic(self, minimal_repo):
         """Test that context pack output is identical across runs."""
+
         def generate_context_pack():
             files, stats = scan_repository(minimal_repo)
             scanned_paths = {f.relative_path for f in files}
@@ -82,6 +83,7 @@ class TestDeterministicOutput:
 
     def test_jsonl_is_deterministic(self, minimal_repo):
         """Test that JSONL output is identical across runs."""
+
         def generate_jsonl():
             files, _ = scan_repository(minimal_repo)
             scanned_paths = {f.relative_path for f in files}
@@ -102,6 +104,7 @@ class TestDeterministicOutput:
 
     def test_report_json_is_deterministic(self, minimal_repo):
         """Test that report.json content (excluding paths) is identical across runs."""
+
         def generate_report():
             with tempfile.TemporaryDirectory() as outdir:
                 output_dir = Path(outdir)
@@ -120,7 +123,11 @@ class TestDeterministicOutput:
                 stats.processing_time_seconds = 1.0
 
                 context_pack = render_context_pack(
-                    minimal_repo, files, all_chunks, ranker, stats,
+                    minimal_repo,
+                    files,
+                    all_chunks,
+                    ranker,
+                    stats,
                     include_timestamp=False,
                 )
 
@@ -149,6 +156,7 @@ class TestDeterministicOutput:
 
     def test_chunk_ids_are_stable(self, minimal_repo):
         """Test that chunk IDs are stable across runs."""
+
         def get_chunk_ids():
             files, _ = scan_repository(minimal_repo)
             scanned_paths = {f.relative_path for f in files}
@@ -169,6 +177,7 @@ class TestDeterministicOutput:
 
     def test_file_ids_are_stable(self, minimal_repo):
         """Test that file IDs are stable across runs."""
+
         def get_file_ids():
             files, _ = scan_repository(minimal_repo)
             # Sort by path for comparison
@@ -258,7 +267,11 @@ class TestGoldenFileComparison:
             stats.processing_time_seconds = 1.0
 
             context_pack = render_context_pack(
-                minimal_repo, files, all_chunks, ranker, stats,
+                minimal_repo,
+                files,
+                all_chunks,
+                ranker,
+                stats,
                 include_timestamp=False,
             )
 
@@ -287,8 +300,11 @@ class TestGoldenFileComparison:
 
         # Verify stats structure
         stats_keys = [
-            "files_scanned", "files_included", "chunks_created",
-            "total_bytes_included", "files_skipped",
+            "files_scanned",
+            "files_included",
+            "chunks_created",
+            "total_bytes_included",
+            "files_skipped",
         ]
         for key in stats_keys:
             assert key in report["stats"], f"Missing stats key: {key}"
@@ -331,6 +347,7 @@ class TestOutputHashStability:
 
     def test_output_hash_is_stable(self, minimal_repo):
         """Test that deterministic output files have stable hashes."""
+
         def generate_and_hash():
             with tempfile.TemporaryDirectory() as outdir:
                 output_dir = Path(outdir)
@@ -348,7 +365,11 @@ class TestOutputHashStability:
                 stats.processing_time_seconds = 1.0
 
                 context_pack = render_context_pack(
-                    minimal_repo, files, all_chunks, ranker, stats,
+                    minimal_repo,
+                    files,
+                    all_chunks,
+                    ranker,
+                    stats,
                     include_timestamp=False,
                 )
 

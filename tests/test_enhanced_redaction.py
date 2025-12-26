@@ -100,7 +100,9 @@ class TestIsSafeValue:
 
     def test_sha256_hash(self):
         """SHA-256 hashes are safe."""
-        assert is_safe_value("e3b0c44298fc1c149afbf4c8996fb924" + "27ae41e4649b934ca495991b7852b855")
+        assert is_safe_value(
+            "e3b0c44298fc1c149afbf4c8996fb924" + "27ae41e4649b934ca495991b7852b855"
+        )
 
     def test_not_safe(self):
         """Random strings are not safe."""
@@ -186,11 +188,13 @@ class TestRedactorWithConfig:
     def test_custom_pattern(self):
         """Custom patterns are applied."""
         config = RedactionConfig()
-        config.custom_rules.append(RedactionRule(
-            name="internal_key",
-            pattern=re.compile(r"INTERNAL_KEY_[A-Z0-9]{16}"),
-            replacement="[INTERNAL_KEY_REDACTED]",
-        ))
+        config.custom_rules.append(
+            RedactionRule(
+                name="internal_key",
+                pattern=re.compile(r"INTERNAL_KEY_[A-Z0-9]{16}"),
+                replacement="[INTERNAL_KEY_REDACTED]",
+            )
+        )
 
         redactor = Redactor(config=config)
         text = "Use key INTERNAL_KEY_ABCD1234EFGH5678 for auth"
