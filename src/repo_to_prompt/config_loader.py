@@ -22,14 +22,14 @@ try:
     import tomllib  # Python 3.11+
 except ImportError:
     try:
-        import tomli as tomllib  # type: ignore
+        import tomli as tomllib  # type: ignore[import-not-found]
     except ImportError:
-        tomllib = None  # type: ignore
+        tomllib = None  # type: ignore[assignment]
 
 try:
-    import yaml
+    import yaml  # type: ignore[import-not-found]
 except ImportError:
-    yaml = None  # type: ignore
+    yaml = None  # type: ignore[assignment]
 
 
 # Config file search order (first found wins)

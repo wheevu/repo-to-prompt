@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 import pathspec
-from pathspec.patterns import GitWildMatchPattern
+from pathspec.patterns import GitWildMatchPattern  # type: ignore[attr-defined]
 
 from .config import (
     DEFAULT_EXCLUDE_GLOBS,
