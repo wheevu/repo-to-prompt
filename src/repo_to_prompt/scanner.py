@@ -7,7 +7,6 @@ Supports concurrent file I/O with thread pool for improved performance.
 
 from __future__ import annotations
 
-import fnmatch
 import os
 import subprocess
 from collections import defaultdict
@@ -571,7 +570,6 @@ class FileScanner:
 
         # Phase 2: Check binary/minified concurrently
         total = len(candidates)
-        results: list[tuple[Path, str, int] | None] = [None] * total
 
         def check_file(idx: int, file_path: Path, rel_path: str, size: int) -> tuple[int, tuple[Path, str, int] | None]:
             """Check a single file for binary/minified status."""

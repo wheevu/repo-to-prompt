@@ -5,8 +5,6 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-import pytest
-
 from repo_to_prompt.redactor import (
     RedactionConfig,
     RedactionRule,
@@ -193,11 +191,11 @@ class TestRedactorWithConfig:
             pattern=re.compile(r"INTERNAL_KEY_[A-Z0-9]{16}"),
             replacement="[INTERNAL_KEY_REDACTED]",
         ))
-        
+
         redactor = Redactor(config=config)
         text = "Use key INTERNAL_KEY_ABCD1234EFGH5678 for auth"
         result = redactor.redact(text)
-        
+
         assert "[INTERNAL_KEY_REDACTED]" in result
         assert "ABCD1234" not in result
 
@@ -208,12 +206,12 @@ class TestRedactorWithConfig:
             entropy_threshold=4.0,
             entropy_min_length=20,
         )
-        
+
         redactor = Redactor(config=config)
         # High entropy string
         text = "secret = xK9fP2mN7qR4sT6vW8yB3dF5gH1jL0aZ"
         result = redactor.redact(text)
-        
+
         # Should be caught by either generic_secret or entropy
         assert "xK9fP2mN7q" not in result
 
@@ -224,12 +222,12 @@ class TestRedactorWithConfig:
             entropy_threshold=3.0,  # Low threshold
             entropy_min_length=20,
         )
-        
+
         redactor = Redactor(config=config)
         # UUID - should NOT be redacted
         text = "id = 550e8400-e29b-41d4-a716-446655440000"
         result = redactor.redact(text)
-        
+
         assert "550e8400-e29b-41d4-a716-446655440000" in result
 
     def test_paranoid_mode(self):
@@ -238,12 +236,12 @@ class TestRedactorWithConfig:
             paranoid_mode=True,
             paranoid_min_length=32,
         )
-        
+
         redactor = Redactor(config=config)
         # Long random-looking string
         text = "token = ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnop"
         result = redactor.redact(text)
-        
+
         assert "[LONG_TOKEN_REDACTED]" in result or "[SECRET_REDACTED]" in result
 
     def test_paranoid_skips_safe_files(self):
@@ -253,12 +251,12 @@ class TestRedactorWithConfig:
             paranoid_min_length=32,
             safe_file_patterns=["*.md", "*.lock"],
         )
-        
+
         redactor = Redactor(config=config, current_file=Path("README.md"))
         # This would normally be caught by paranoid mode
         text = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnop"
         result = redactor.redact(text)
-        
+
         # Should NOT be redacted in .md file
         assert "ABCDEFGHIJ" in result
 
@@ -267,12 +265,12 @@ class TestRedactorWithConfig:
         config = RedactionConfig(
             allowlist_patterns=["secrets.example", "*.test.py"],
         )
-        
+
         # File matches allowlist
         redactor = Redactor(config=config, current_file=Path("secrets.example"))
         text = "AWS_SECRET_KEY = AKIAIOSFODNN7EXAMPLE"
         result = redactor.redact(text)
-        
+
         # Should NOT be redacted (file is allowlisted)
         assert "AKIAIOSFODNN7EXAMPLE" in result
 
@@ -284,11 +282,11 @@ class TestRedactorWithConfig:
             entropy_min_length=10,
             allowlist_strings={"test_key_12345678901234567890"},
         )
-        
+
         redactor = Redactor(config=config)
         text = "Use key test_key_12345678901234567890 for testing"
-        result = redactor.redact(text)
-        
+        _ = redactor.redact(text)  # Result not used, testing no exception
+
         # The specific string should be preserved
         # (though generic_secret pattern might still match)
         # This tests that entropy detection respects allowlist
@@ -298,14 +296,14 @@ class TestRedactorWithConfig:
         config = RedactionConfig(
             allowlist_patterns=["*.safe"],
         )
-        
+
         redactor = Redactor(config=config, current_file=Path("secrets.py"))
-        
+
         # Initially not allowlisted
         text = "api_key = ghp_1234567890123456789012345678901234"
         result1 = redactor.redact(text)
         assert "ghp_" not in result1
-        
+
         # Change to allowlisted file
         redactor.set_current_file(Path("config.safe"))
         result2 = redactor.redact(text)
@@ -320,7 +318,7 @@ class TestContextBasedPatterns:
         redactor = Redactor()
         text = "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test"
         result = redactor.redact(text)
-        
+
         assert "Bearer" in result
         assert "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9" not in result
 
@@ -329,7 +327,7 @@ class TestContextBasedPatterns:
         redactor = Redactor()
         text = "Authorization: Basic dXNlcm5hbWU6cGFzc3dvcmQ="
         result = redactor.redact(text)
-        
+
         assert "Basic" in result
         assert "dXNlcm5hbWU6cGFzc3dvcmQ=" not in result
 
@@ -338,7 +336,7 @@ class TestContextBasedPatterns:
         redactor = Redactor()
         text = "X-API-Key: xapi_1234567890123456"
         result = redactor.redact(text)
-        
+
         # The pattern may match as generic secret or x_api_key_header
         assert "xapi_1234567890123456" not in result
 
@@ -355,7 +353,7 @@ class TestRedactorStats:
         """
         redactor.redact(text)
         stats = redactor.get_stats()
-        
+
         # At least one pattern should match (github_token or password)
         assert len(stats) >= 1
 
@@ -370,7 +368,7 @@ class TestRedactorStats:
         text = "token = xK9fP2mN7qR4sT6vW8yB3dF5gH1jL0aZbC"
         redactor.redact(text)
         stats = redactor.get_stats()
-        
+
         # Either caught by generic_secret or entropy
         assert len(stats) > 0
 
@@ -380,7 +378,7 @@ class TestRedactorStats:
         # Use a definite pattern that will match (password pattern needs 16+ chars)
         redactor.redact('password = "mysupersecretpassword123"')
         assert len(redactor.get_stats()) > 0
-        
+
         redactor.reset_stats()
         assert len(redactor.get_stats()) == 0
 

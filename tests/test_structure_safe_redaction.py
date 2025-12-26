@@ -14,7 +14,6 @@ The approach is:
 from __future__ import annotations
 
 import ast
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -22,7 +21,6 @@ import pytest
 from repo_to_prompt.redactor import (
     RedactionConfig,
     Redactor,
-    create_redactor,
 )
 
 
@@ -524,7 +522,7 @@ class TestInlineReplacementForSourceFiles:
         redactor = Redactor(config=config, current_file=Path(filename))
 
         # Use api_key = which matches the generic_secret pattern
-        code = f'api_key = "abcdefghijklmnopqrstuvwxyz123456"\n'
+        code = 'api_key = "abcdefghijklmnopqrstuvwxyz123456"\n'
         result = redactor.redact(code)
 
         # Secret should be replaced inline

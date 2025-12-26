@@ -115,7 +115,7 @@ class RedactionConfig:
     structure_safe_redaction: bool = True
 
     @classmethod
-    def from_dict(cls, data: dict) -> "RedactionConfig":
+    def from_dict(cls, data: dict) -> RedactionConfig:
         """Create RedactionConfig from a dictionary (e.g., from config file)."""
         config = cls()
 
@@ -682,15 +682,18 @@ class Redactor:
                 )
                 for match in pattern.finditer(line):
                     value = match.group(1)
-                    if not self._is_string_allowlisted(value) and not is_safe_value(value):
-                        if is_high_entropy_secret(
+                    if (
+                        not self._is_string_allowlisted(value)
+                        and not is_safe_value(value)
+                        and is_high_entropy_secret(
                             value,
                             threshold=self.config.entropy_threshold,
                             min_length=self.config.entropy_min_length,
-                        ):
-                            has_secret = True
-                            rule_name = "entropy_detected"
-                            break
+                        )
+                    ):
+                        has_secret = True
+                        rule_name = "entropy_detected"
+                        break
 
             if not has_secret and self.config.paranoid_mode and not self._is_file_safe():
                 pattern = re.compile(

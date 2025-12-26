@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import ast
 import re
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -22,7 +21,7 @@ from repo_to_prompt.config import FileInfo
 from repo_to_prompt.ranker import FileRanker
 from repo_to_prompt.redactor import create_redactor
 from repo_to_prompt.renderer import render_context_pack
-from repo_to_prompt.scanner import scan_repository, generate_tree
+from repo_to_prompt.scanner import generate_tree, scan_repository
 from repo_to_prompt.utils import read_file_safe
 
 
@@ -64,10 +63,7 @@ def has_mojibake(text: str) -> bool:
     # Check for broken surrogate-like patterns
     # UTF-8 emoji bytes decoded as Latin-1 produce sequences with Ã° (ð in Latin-1)
     # followed by Ÿ or other chars
-    if "\xc3\xb0\xc5\xb8" in text or "\xc3\xb0\xc2\x9f" in text:
-        return True
-
-    return False
+    return "\xc3\xb0\xc5\xb8" in text or "\xc3\xb0\xc2\x9f" in text
 
 
 def detect_encoding_corruption(original: str, rendered: str) -> list[str]:
@@ -539,9 +535,9 @@ class TestEndToEndIntegrity:
         files, stats = scan_repository(
             repo_root,
             exclude_globs={
-                "out/**", 
-                ".git/**", 
-                "__pycache__/**", 
+                "out/**",
+                ".git/**",
+                "__pycache__/**",
                 "tests/**",
             },
         )

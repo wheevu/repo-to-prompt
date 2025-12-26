@@ -21,13 +21,12 @@ from pathlib import Path
 import typer
 from rich.console import Console
 from rich.progress import (
+    BarColumn,
+    MofNCompleteColumn,
     Progress,
     SpinnerColumn,
     TextColumn,
-    BarColumn,
-    TaskProgressColumn,
     TimeElapsedColumn,
-    MofNCompleteColumn,
 )
 
 from . import __version__
@@ -36,10 +35,9 @@ from .config import OutputMode
 from .config_loader import load_config, merge_cli_with_config
 from .fetcher import FetchError, RepoContext
 from .ranker import FileRanker
-from .redactor import create_redactor, RedactionConfig
+from .redactor import RedactionConfig, create_redactor
 from .renderer import render_context_pack, write_outputs
-from .scanner import scan_repository, FileScanner
-from .utils import estimate_tokens
+from .scanner import FileScanner, scan_repository
 
 # Initialize CLI app
 app = typer.Typer(
@@ -361,13 +359,13 @@ def export(
                 m_mode = OutputMode(merged["mode"])
                 m_respect_gitignore = merged["respect_gitignore"]
                 m_redact_secrets = merged["redact_secrets"]
-                m_tree_depth = merged["tree_depth"]
+                _ = merged["tree_depth"]  # Used in merged config, not needed here
                 m_ranking_weights = merged["ranking_weights"]
                 m_redaction_config = merged.get("redaction_config", {})
 
                 # Phase 1: Scan repository (with progress bar)
                 console.print("[cyan]Scanning repository...[/cyan]")
-                
+
                 scanner = FileScanner(
                     root_path=repo_path,
                     include_extensions=m_include_extensions,
@@ -377,7 +375,7 @@ def export(
                     follow_symlinks=m_follow_symlinks,
                     skip_minified=m_skip_minified,
                 )
-                
+
                 files = list(scanner.scan())
                 stats = scanner.stats
 

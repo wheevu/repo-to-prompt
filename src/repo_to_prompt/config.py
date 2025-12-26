@@ -11,7 +11,6 @@ from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 
-
 # Current report schema version
 REPORT_SCHEMA_VERSION = "1.0.0"
 
@@ -393,21 +392,21 @@ class ScanStats:
             "total_bytes_scanned": self.total_bytes_scanned,
             "total_tokens_estimated": self.total_tokens_estimated,
         }
-        
+
         # Include redaction counts if any
         if self.redaction_counts:
             result["redaction_counts"] = dict(
                 sorted(self.redaction_counts.items(), key=lambda x: (-x[1], x[0]))
             )
-        
+
         # Include top ranked files if set
         if self.top_ranked_files:
             result["top_ranked_files"] = self.top_ranked_files
-        
+
         # Include dropped files summary if any
         if self.dropped_files:
             result["dropped_files"] = self.dropped_files
-        
+
         return result
 
 

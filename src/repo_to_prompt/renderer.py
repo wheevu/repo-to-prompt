@@ -350,7 +350,7 @@ class JSONLRenderer:
 class ReportRenderer:
     """
     Renders the processing report as JSON.
-    
+
     Report schema is versioned for backwards compatibility.
     """
 
@@ -373,7 +373,7 @@ class ReportRenderer:
             files: List of files processed (for file manifest)
         """
         from .config import REPORT_SCHEMA_VERSION
-        
+
         self.stats = stats
         self.config = config
         self.output_files = sorted(output_files)  # Sort for determinism
@@ -388,11 +388,11 @@ class ReportRenderer:
         }
         if self.include_timestamp:
             report["generated_at"] = datetime.now(timezone.utc).isoformat()
-        
+
         report["stats"] = self.stats.to_dict()
         report["config"] = self.config
         report["output_files"] = self.output_files
-        
+
         # Include file manifest with IDs for deterministic reference
         if self.files:
             report["files"] = [
@@ -404,7 +404,7 @@ class ReportRenderer:
                 }
                 for f in sorted(self.files, key=lambda x: (-x.priority, x.relative_path))
             ]
-        
+
         return report
 
     def write(self, output_path: Path) -> None:
