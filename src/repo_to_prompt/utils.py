@@ -51,12 +51,12 @@ def stable_hash(content: str, path: str, start_line: int, end_line: int) -> str:
 def detect_encoding(file_path: Path, sample_size: int = 8192) -> str:
     """
     Detect the encoding of a file.
-    
+
     Strategy:
     1. Check for BOM markers first
     2. Try UTF-8 (most common for modern source files)
     3. Fall back to chardet only if UTF-8 fails
-    
+
     This approach prevents chardet from incorrectly detecting UTF-8 files
     as Latin-1 or Windows-1252, which causes mojibake.
 
@@ -145,13 +145,13 @@ def read_file_safe(
 ) -> tuple[str, str]:
     """
     Safely read a file with encoding detection and error handling.
-    
+
     Strategy:
     1. If encoding specified, use it
     2. Otherwise, try UTF-8 first (most common for source files)
     3. If UTF-8 fails with errors, detect encoding and retry
     4. Always use errors="replace" to avoid crashes
-    
+
     This ensures UTF-8 files with emojis/smart quotes are read correctly.
 
     Args:
@@ -171,7 +171,7 @@ def read_file_safe(
         except LookupError:
             # Unknown encoding, fall through to auto-detect
             pass
-    
+
     # Try UTF-8 first (strict mode to detect issues)
     try:
         with open(file_path, encoding="utf-8", errors="strict") as f:
@@ -183,7 +183,7 @@ def read_file_safe(
     except Exception:
         # Other error (file not found, permission, etc.)
         pass
-    
+
     # Fall back to encoding detection
     detected = detect_encoding(file_path)
     try:
@@ -336,8 +336,8 @@ def is_likely_generated(file_path: Path, content_sample: str = "") -> bool:
         if indicator in name:
             return True
 
-    # Check common generated directories
-    path_str = str(file_path).lower()
+    # Check common generated directories - normalize path for cross-platform
+    path_str = normalize_path(str(file_path)).lower()
     if any(d in path_str for d in ["generated/", "gen/", "auto/", "build/"]):
         return True
 
@@ -374,7 +374,8 @@ def is_lock_file(file_path: Path) -> bool:
 
 def is_vendored(file_path: Path) -> bool:
     """Check if a file appears to be vendored/third-party."""
-    path_str = str(file_path).lower()
+    # Normalize path for cross-platform compatibility
+    path_str = normalize_path(str(file_path)).lower()
     return any(d in path_str for d in [
         "vendor/",
         "vendors/",

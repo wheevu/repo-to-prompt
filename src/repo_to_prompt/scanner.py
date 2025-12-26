@@ -39,16 +39,16 @@ class FileCacheKey(NamedTuple):
 class FileCache:
     """
     Simple cache for file metadata and computed values.
-    
+
     Cache keys are based on (path, mtime_ns, size) for freshness detection.
     """
-    
+
     def __init__(self):
         self._binary_cache: dict[FileCacheKey, bool] = {}
         self._minified_cache: dict[FileCacheKey, bool] = {}
         self._token_cache: dict[FileCacheKey, int] = {}
         self._hash_cache: dict[FileCacheKey, str] = {}
-    
+
     def _get_key(self, path: Path) -> FileCacheKey | None:
         """Get cache key for a file, or None if stat fails."""
         try:
@@ -56,66 +56,66 @@ class FileCache:
             return FileCacheKey(str(path), stat.st_mtime_ns, stat.st_size)
         except OSError:
             return None
-    
+
     def get_binary(self, path: Path) -> bool | None:
         """Get cached binary check result."""
         key = self._get_key(path)
         if key:
             return self._binary_cache.get(key)
         return None
-    
+
     def set_binary(self, path: Path, is_binary: bool) -> None:
         """Cache binary check result."""
         key = self._get_key(path)
         if key:
             self._binary_cache[key] = is_binary
-    
+
     def get_minified(self, path: Path) -> bool | None:
         """Get cached minified check result."""
         key = self._get_key(path)
         if key:
             return self._minified_cache.get(key)
         return None
-    
+
     def set_minified(self, path: Path, is_minified: bool) -> None:
         """Cache minified check result."""
         key = self._get_key(path)
         if key:
             self._minified_cache[key] = is_minified
-    
+
     def get_tokens(self, path: Path) -> int | None:
         """Get cached token count."""
         key = self._get_key(path)
         if key:
             return self._token_cache.get(key)
         return None
-    
+
     def set_tokens(self, path: Path, tokens: int) -> None:
         """Cache token count."""
         key = self._get_key(path)
         if key:
             self._token_cache[key] = tokens
-    
+
     def get_hash(self, path: Path) -> str | None:
         """Get cached content hash."""
         key = self._get_key(path)
         if key:
             return self._hash_cache.get(key)
         return None
-    
+
     def set_hash(self, path: Path, content_hash: str) -> None:
         """Cache content hash."""
         key = self._get_key(path)
         if key:
             self._hash_cache[key] = content_hash
-    
+
     def clear(self) -> None:
         """Clear all caches."""
         self._binary_cache.clear()
         self._minified_cache.clear()
         self._token_cache.clear()
         self._hash_cache.clear()
-    
+
     def stats(self) -> dict[str, int]:
         """Get cache statistics."""
         return {
@@ -339,7 +339,7 @@ class FileScanner:
         self.max_line_length = max_line_length
         self.max_workers = max_workers
         self.use_cache = use_cache
-        
+
         # Get cache
         self._cache = get_file_cache() if use_cache else None
 
@@ -447,12 +447,12 @@ class FileScanner:
             is_binary = None
             if self._cache:
                 is_binary = self._cache.get_binary(file_path)
-            
+
             if is_binary is None:
                 is_binary = is_binary_file(file_path)
                 if self._cache:
                     self._cache.set_binary(file_path, is_binary)
-            
+
             if is_binary:
                 self.stats.files_skipped_binary += 1
                 continue
@@ -462,12 +462,12 @@ class FileScanner:
                 is_minified = None
                 if self._cache:
                     is_minified = self._cache.get_minified(file_path)
-                
+
                 if is_minified is None:
                     is_minified = is_likely_minified(file_path, self.max_line_length)
                     if self._cache:
                         self._cache.set_minified(file_path, is_minified)
-                
+
                 if is_minified:
                     self.stats.files_skipped_glob += 1
                     self._ignored_pattern_counts["(minified)"] += 1
@@ -512,119 +512,119 @@ class FileScanner:
         self.stats.top_ignored_patterns = dict(
             sorted(self._ignored_pattern_counts.items(), key=lambda x: (-x[1], x[0]))
         )
-    
+
     def scan_concurrent(self, progress_callback: callable | None = None) -> list[FileInfo]:
         """
         Scan the repository using concurrent file I/O.
-        
+
         This method is faster for large repositories with many files,
         as it parallelizes binary/minified checks across threads.
-        
+
         Args:
             progress_callback: Optional callback(current, total) for progress updates
-            
+
         Returns:
             List of FileInfo objects sorted by relative path
         """
         # Phase 1: Collect all candidate paths (fast, single-threaded)
         candidates: list[tuple[Path, str, int]] = []
-        
+
         for file_path in self._walk_files():
             self.stats.files_scanned += 1
-            
+
             try:
                 rel_path = str(file_path.relative_to(self.root_path))
             except ValueError:
                 continue
-            
+
             rel_path = normalize_path(rel_path)
-            
+
             # Check exclude globs
             matching_pattern = self._matches_exclude_glob(rel_path)
             if matching_pattern:
                 self.stats.files_skipped_glob += 1
                 self._ignored_pattern_counts[matching_pattern] += 1
                 continue
-            
+
             # Check gitignore
             if self._gitignore and self._gitignore.is_ignored(file_path):
                 self.stats.files_skipped_gitignore += 1
                 continue
-            
+
             # Check extension
             if not self._should_include_extension(file_path):
                 self.stats.files_skipped_extension += 1
                 continue
-            
+
             # Check file size
             try:
                 size = file_path.stat().st_size
                 self.stats.total_bytes_scanned += size
             except OSError:
                 continue
-            
+
             if size > self.max_file_bytes:
                 self.stats.files_skipped_size += 1
                 continue
-            
+
             candidates.append((file_path, rel_path, size))
-        
+
         # Phase 2: Check binary/minified concurrently
         total = len(candidates)
         results: list[tuple[Path, str, int] | None] = [None] * total
-        
+
         def check_file(idx: int, file_path: Path, rel_path: str, size: int) -> tuple[int, tuple[Path, str, int] | None]:
             """Check a single file for binary/minified status."""
             # Check if binary (with caching)
             is_binary = None
             if self._cache:
                 is_binary = self._cache.get_binary(file_path)
-            
+
             if is_binary is None:
                 is_binary = is_binary_file(file_path)
                 if self._cache:
                     self._cache.set_binary(file_path, is_binary)
-            
+
             if is_binary:
                 return (idx, None, "binary")
-            
+
             # Check for minified files (with caching)
             if self.skip_minified:
                 is_minified = None
                 if self._cache:
                     is_minified = self._cache.get_minified(file_path)
-                
+
                 if is_minified is None:
                     is_minified = is_likely_minified(file_path, self.max_line_length)
                     if self._cache:
                         self._cache.set_minified(file_path, is_minified)
-                
+
                 if is_minified:
                     return (idx, None, "minified")
-            
+
             return (idx, (file_path, rel_path, size), None)
-        
+
         # Determine number of workers
         if self.max_workers is None:
             max_workers = min(32, (os.cpu_count() or 1) + 4)
         else:
             max_workers = self.max_workers
-        
+
         # Use thread pool for I/O-bound checks
         valid_files: list[tuple[Path, str, int]] = []
         completed = 0
-        
+
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {
                 executor.submit(check_file, i, *candidate): i
                 for i, candidate in enumerate(candidates)
             }
-            
+
             for future in as_completed(futures):
                 completed += 1
                 if progress_callback:
                     progress_callback(completed, total)
-                
+
                 try:
                     idx, result, skip_reason = future.result()
                     if result is not None:
@@ -636,20 +636,20 @@ class FileScanner:
                         self._ignored_pattern_counts["(minified)"] += 1
                 except Exception:
                     pass
-        
+
         # Sort by relative path for deterministic ordering
         valid_files.sort(key=lambda x: x[1])
-        
+
         # Phase 3: Create FileInfo objects
         file_infos: list[FileInfo] = []
         for file_path, rel_path, size in valid_files:
             ext = file_path.suffix.lower()
             language = get_language(ext, file_path.name)
-            
+
             self.stats.languages_detected[language] = (
                 self.stats.languages_detected.get(language, 0) + 1
             )
-            
+
             file_info = FileInfo(
                 path=file_path,
                 relative_path=rel_path,
@@ -657,16 +657,16 @@ class FileScanner:
                 extension=ext,
                 language=language,
             )
-            
+
             self.stats.files_included += 1
             self.stats.total_bytes_included += size
             file_infos.append(file_info)
-        
+
         # Finalize stats
         self.stats.top_ignored_patterns = dict(
             sorted(self._ignored_pattern_counts.items(), key=lambda x: (-x[1], x[0]))
         )
-        
+
         return file_infos
 
     def _walk_files(self) -> Generator[Path, None, None]:

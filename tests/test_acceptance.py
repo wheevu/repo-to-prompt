@@ -29,26 +29,26 @@ from repo_to_prompt.utils import read_file_safe
 def has_mojibake(text: str) -> bool:
     """
     Detect mojibake in text.
-    
+
     Mojibake occurs when UTF-8 bytes are incorrectly decoded as Latin-1/Windows-1252.
     Common patterns:
     - UTF-8 ellipsis (U+2026, bytes E2 80 A6) becomes "â€¦" in Latin-1
     - UTF-8 right single quote (U+2019, bytes E2 80 99) becomes "â€™"
     - UTF-8 left double quote (U+201C, bytes E2 80 9C) becomes "â€œ"
-    
+
     We detect this by looking for sequences that are characteristic of
     UTF-8 bytes decoded incorrectly.
     """
     # These byte sequences appear when UTF-8 multi-byte chars are decoded as Latin-1
     # They start with 0xC3 or 0xC2 (Ã, Â) or 0xE2 which becomes â in Latin-1
     # Pattern: â followed by €, then another character
-    
+
     # Check for the telltale "â€" sequence (0xE2 0x80 decoded as Latin-1)
     # This appears at the start of many UTF-8 encoded punctuation marks
     if "\xe2\x80" in text.encode("latin-1", errors="ignore").decode("latin-1", errors="ignore"):
         # Need a different approach - check if encoding round-trip produces different result
         pass
-    
+
     # Look for common mojibake patterns that indicate wrong decoding
     # These patterns are unlikely to appear in legitimate UTF-8 text
     mojibake_indicators = [
@@ -56,28 +56,28 @@ def has_mojibake(text: str) -> bool:
         "\xc3\xa2\xc2\x80",  # Start of many mojibake sequences
         "Ã¢â‚¬",  # Common mojibake sequence
     ]
-    
+
     for indicator in mojibake_indicators:
         if indicator in text:
             return True
-    
+
     # Check for broken surrogate-like patterns
     # UTF-8 emoji bytes decoded as Latin-1 produce sequences with Ã° (ð in Latin-1)
     # followed by Ÿ or other chars
     if "\xc3\xb0\xc5\xb8" in text or "\xc3\xb0\xc2\x9f" in text:
         return True
-        
+
     return False
 
 
 def detect_encoding_corruption(original: str, rendered: str) -> list[str]:
     """
     Detect if specific UTF-8 characters were corrupted during rendering.
-    
+
     Returns list of corrupted character descriptions, or empty if all OK.
     """
     issues = []
-    
+
     # Test specific UTF-8 characters that should be preserved
     test_chars = [
         ("\u2026", "ellipsis"),
@@ -86,18 +86,18 @@ def detect_encoding_corruption(original: str, rendered: str) -> list[str]:
         ("\u201d", "right double quote"),
         ("\u2014", "em dash"),
     ]
-    
+
     for char, name in test_chars:
         if char in original and char not in rendered:
             issues.append(f"{name} was corrupted")
-    
+
     return issues
 
 
 class TestUTF8Fidelity:
     """
     Tests that UTF-8 content is preserved correctly through the pipeline.
-    
+
     This catches encoding bugs where chardet misdetects UTF-8 as Latin-1,
     causing smart quotes, ellipses, and emojis to become corrupted.
     """
@@ -131,7 +131,7 @@ MESSAGE = "Hello… world! 🌍"
         assert "🎉" in content, "Emoji not preserved"
         assert "├" in content, "Box drawing not preserved"
         assert "π" in content, "Greek letter not preserved"
-        
+
         # Check no encoding corruption
         issues = detect_encoding_corruption(utf8_content, content)
         assert not issues, f"Encoding corruption detected: {issues}"
@@ -168,11 +168,11 @@ BOX = "├── item"
         """Full pipeline must preserve UTF-8 in context_pack.md."""
         # Create a mini project with UTF-8 content
         (tmp_path / "src").mkdir()
-        
+
         readme = tmp_path / "README.md"
         readme_content = "# Test Project 🎉\n\nThis is a test\u2026 with smart \u201cquotes\u201d.\n"
         readme.write_text(readme_content, encoding="utf-8")
-        
+
         code = tmp_path / "src" / "main.py"
         code.write_text(
             '"""Main module."""\nMESSAGE = "Hello\u2026 🌍"\n',
@@ -225,7 +225,7 @@ BOX = "├── item"
 class TestContextPackCodeValidity:
     """
     Tests that all Python code blocks in context_pack.md are syntactically valid.
-    
+
     This catches bugs where:
     - Redaction placeholders break syntax
     - Chunking splits strings/expressions mid-literal
@@ -236,31 +236,31 @@ class TestContextPackCodeValidity:
     def extract_python_code_blocks(markdown: str) -> list[tuple[str, int]]:
         """
         Extract all Python code blocks from markdown.
-        
+
         Returns:
             List of (code_content, line_number) tuples
         """
         blocks = []
-        
+
         # Match fenced code blocks with python/py language
         pattern = re.compile(
             r'^```(?:python|py)\s*\n(.*?)^```',
             re.MULTILINE | re.DOTALL
         )
-        
+
         for match in pattern.finditer(markdown):
             code = match.group(1)
             # Calculate line number
             line_num = markdown[:match.start()].count('\n') + 1
             blocks.append((code, line_num))
-        
+
         return blocks
 
     def test_all_python_blocks_parse(self, tmp_path: Path):
         """Every Python code block in context_pack must be valid Python."""
         # Create a project with various Python constructs
         (tmp_path / "src").mkdir()
-        
+
         # Simple module
         (tmp_path / "src" / "simple.py").write_text('''
 """Simple module."""
@@ -271,10 +271,10 @@ def hello(name: str = "World") -> str:
 
 class Greeter:
     """A greeter class."""
-    
+
     def __init__(self, prefix: str = "Hi"):
         self.prefix = prefix
-    
+
     def greet(self, name: str) -> str:
         return f"{self.prefix}, {name}!"
 ''', encoding="utf-8")
@@ -316,7 +316,7 @@ API_KEY = "test_key_12345678901234567890"
 
         # Extract all Python code blocks
         blocks = self.extract_python_code_blocks(context_pack)
-        
+
         assert len(blocks) > 0, "No Python code blocks found in context pack"
 
         # Verify each block parses
@@ -325,7 +325,7 @@ API_KEY = "test_key_12345678901234567890"
             code = code.strip()
             if not code:
                 continue
-            
+
             try:
                 ast.parse(code)
             except SyntaxError as e:
@@ -371,7 +371,7 @@ config = {
         redactor = create_redactor(enabled=True)
         redactor.set_current_file(test_file)
         redacted_content = redactor.redact(code_with_secrets)
-        
+
         # Redacted content must still parse
         try:
             ast.parse(redacted_content)
@@ -381,7 +381,7 @@ config = {
                 f"Error: {e}\n"
                 f"Content:\n{redacted_content}"
             )
-        
+
         # Verify secrets were redacted
         assert "AKIAIOSFODNN7EXAMPLE" not in redacted_content, "AWS key should be redacted"
         assert "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" not in redacted_content, "GitHub token should be redacted"
@@ -401,7 +401,7 @@ API_KEY = "mytestapikey12345678901234567890ab"
 @dataclass
 class Config:
     """Configuration class."""
-    
+
     name: str
     values: Dict[str, str] = field(default_factory=dict)
     items: List[str] = field(default_factory=list)
@@ -421,18 +421,18 @@ def process_data(
 ) -> Dict[str, any]:
     """Process data with options."""
     result = {}
-    
+
     for key, value in data.items():
         if validate and not isinstance(key, str):
             raise ValueError(f"Invalid key: {key}")
         result[key] = value
-    
+
     return result
 
 
 class DataProcessor:
     """Process data streams."""
-    
+
     def __init__(
         self,
         config: Config,
@@ -442,14 +442,14 @@ class DataProcessor:
         self.config = config
         self.batch_size = batch_size
         self._buffer: List[Dict] = []
-    
+
     def process(self, item: Dict) -> None:
         """Add item to buffer and process if full."""
         self._buffer.append(item)
-        
+
         if len(self._buffer) >= self.batch_size:
             self._flush()
-    
+
     def _flush(self) -> None:
         """Flush the buffer."""
         if self._buffer:
@@ -466,7 +466,7 @@ class DataProcessor:
         redactor = create_redactor(enabled=True)
         redactor.set_current_file(test_file)
         redacted_content = redactor.redact(complex_code)
-        
+
         try:
             ast.parse(redacted_content)
         except SyntaxError as e:
@@ -475,7 +475,7 @@ class DataProcessor:
                 f"Error: {e}\n"
                 f"Content preview:\n{redacted_content[:500]}..."
             )
-        
+
         # Verify some secrets were redacted
         assert "mytestapikey12345678901234567890ab" not in redacted_content
         assert "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" not in redacted_content
@@ -487,28 +487,28 @@ class TestEndToEndIntegrity:
     def test_source_files_parse_after_redaction(self):
         """
         Verify that source files remain syntactically valid after redaction.
-        
+
         This is the key acceptance test - redaction should never break
         Python syntax in source files.
         """
         repo_root = Path(__file__).parent.parent
-        
+
         # Only run if we're in the actual repo (not installed as package)
         if not (repo_root / "src" / "repo_to_prompt").exists():
             pytest.skip("Not running in source repository")
 
         src_dir = repo_root / "src" / "repo_to_prompt"
-        
+
         redactor = create_redactor(enabled=True)
-        
+
         failures = []
         for py_file in src_dir.glob("*.py"):
             redactor.set_current_file(py_file)
-            
+
             # Read and redact
             content, _ = read_file_safe(py_file)
             redacted = redactor.redact(content)
-            
+
             # Must still parse
             try:
                 ast.parse(redacted)
@@ -518,7 +518,7 @@ class TestEndToEndIntegrity:
                     "error": str(e),
                     "preview": redacted[:200],
                 })
-        
+
         if failures:
             msg = "\n\n".join(
                 f"{f['file']}: {f['error']}\nPreview: {f['preview']}"
@@ -531,7 +531,7 @@ class TestEndToEndIntegrity:
         Verify UTF-8 characters are preserved in context pack output.
         """
         repo_root = Path(__file__).parent.parent
-        
+
         if not (repo_root / "src" / "repo_to_prompt").exists():
             pytest.skip("Not running in source repository")
 
@@ -545,7 +545,7 @@ class TestEndToEndIntegrity:
                 "tests/**",
             },
         )
-        
+
         if not files:
             pytest.skip("No files found")
 
@@ -554,7 +554,7 @@ class TestEndToEndIntegrity:
 
         redactor = create_redactor(enabled=False)  # No redaction to test encoding
         all_chunks = []
-        
+
         for f in files[:5]:
             redactor.set_current_file(f.path)
             try:
@@ -590,19 +590,19 @@ class TestEndToEndIntegrity:
         """
         repo_root = Path(__file__).parent.parent
         readme_path = repo_root / "README.md"
-        
+
         if not readme_path.exists():
             pytest.skip("README.md not found")
-        
+
         # Read README directly
         content, encoding = read_file_safe(readme_path)
-        
+
         # Must be UTF-8
         assert encoding == "utf-8", f"README should be UTF-8, got {encoding}"
-        
+
         # Check specific UTF-8 characters we know are in the README
         # Ellipsis: …
         assert "\u2026" in content, "Ellipsis character not preserved in README"
-        
+
         # Right single quote: '
         assert "\u2019" in content, "Smart quote not preserved in README"

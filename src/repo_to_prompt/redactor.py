@@ -40,9 +40,9 @@ class RedactionRule:
 class RedactionConfig:
     """
     Configuration for advanced redaction features.
-    
+
     Loaded from config file or set programmatically.
-    
+
     Structure-safe redaction:
     - Source files (matching source_safe_patterns) use line-level redaction
     - Line-level redaction replaces entire lines with comments, preserving syntax
@@ -50,23 +50,23 @@ class RedactionConfig:
     """
     # Custom regex patterns to add
     custom_rules: list[RedactionRule] = field(default_factory=list)
-    
+
     # File/path patterns to skip redaction (allowlist)
     # Supports glob patterns like "*.md", "docs/**", "test_*.py"
     allowlist_patterns: list[str] = field(default_factory=list)
-    
+
     # Specific strings to never redact (false positive list)
     allowlist_strings: set[str] = field(default_factory=set)
-    
+
     # Entropy-based detection
     entropy_enabled: bool = False
     entropy_threshold: float = 4.5  # Shannon entropy threshold (0-log2(charset))
     entropy_min_length: int = 20  # Minimum string length for entropy check
-    
+
     # Paranoid mode: redact any base64-like string >= 32 chars
     paranoid_mode: bool = False
     paranoid_min_length: int = 32
-    
+
     # Files that are "known safe" - skip paranoid mode
     safe_file_patterns: list[str] = field(default_factory=lambda: [
         "*.md",
@@ -81,7 +81,7 @@ class RedactionConfig:
         "poetry.lock",
         "Cargo.lock",
     ])
-    
+
     # Source code patterns - use structure-safe (line-level) redaction
     # By default, Python/JS/TS source files use line-level redaction to preserve syntax
     source_safe_patterns: list[str] = field(default_factory=lambda: [
@@ -108,17 +108,17 @@ class RedactionConfig:
         "*.bash",
         "*.zsh",
     ])
-    
+
     # Enable structure-safe redaction for source files (default: True)
     # When True, source files use line-level redaction that preserves syntax
     # When False, uses inline replacement (may break syntax - use with caution)
     structure_safe_redaction: bool = True
-    
+
     @classmethod
     def from_dict(cls, data: dict) -> "RedactionConfig":
         """Create RedactionConfig from a dictionary (e.g., from config file)."""
         config = cls()
-        
+
         # Custom rules
         for rule_data in data.get("custom_rules", []):
             if "pattern" in rule_data:
@@ -131,62 +131,62 @@ class RedactionConfig:
                     ))
                 except re.error:
                     pass  # Skip invalid patterns
-        
+
         # Allowlist
         config.allowlist_patterns = list(data.get("allowlist_patterns", []))
         config.allowlist_strings = set(data.get("allowlist_strings", []))
-        
+
         # Entropy settings
         if "entropy" in data:
             entropy = data["entropy"]
             config.entropy_enabled = entropy.get("enabled", False)
             config.entropy_threshold = float(entropy.get("threshold", 4.5))
             config.entropy_min_length = int(entropy.get("min_length", 20))
-        
+
         # Paranoid mode
         if "paranoid" in data:
             paranoid = data["paranoid"]
             config.paranoid_mode = paranoid.get("enabled", False)
             config.paranoid_min_length = int(paranoid.get("min_length", 32))
-        
+
         # Safe file patterns
         if "safe_file_patterns" in data:
             config.safe_file_patterns = list(data["safe_file_patterns"])
-        
+
         # Source safe patterns (structure-safe redaction)
         if "source_safe_patterns" in data:
             config.source_safe_patterns = list(data["source_safe_patterns"])
-        
+
         # Structure-safe redaction toggle
         if "structure_safe_redaction" in data:
             config.structure_safe_redaction = bool(data["structure_safe_redaction"])
-        
+
         return config
 
 
 def calculate_entropy(s: str) -> float:
     """
     Calculate Shannon entropy of a string.
-    
+
     Higher entropy = more random = more likely to be a secret.
     Returns value between 0 and log2(charset_size).
     For base64 charset (64 chars), max is ~6 bits.
     For alphanumeric (62 chars), max is ~5.95 bits.
-    
+
     Args:
         s: String to analyze
-        
+
     Returns:
         Shannon entropy in bits per character
     """
     if not s:
         return 0.0
-    
+
     # Count character frequencies
     freq: dict[str, int] = {}
     for char in s:
         freq[char] = freq.get(char, 0) + 1
-    
+
     # Calculate entropy
     length = len(s)
     entropy = 0.0
@@ -194,7 +194,7 @@ def calculate_entropy(s: str) -> float:
         if count > 0:
             p = count / length
             entropy -= p * math.log2(p)
-    
+
     return entropy
 
 
@@ -205,22 +205,22 @@ def is_high_entropy_secret(
 ) -> bool:
     """
     Check if a string appears to be a high-entropy secret.
-    
+
     Args:
         s: String to check
         threshold: Minimum entropy to consider as secret
         min_length: Minimum length to consider
-        
+
     Returns:
         True if the string appears to be a secret
     """
     if len(s) < min_length:
         return False
-    
+
     # Must be alphanumeric with allowed special chars
     if not re.match(r'^[A-Za-z0-9+/=_\-]+$', s):
         return False
-    
+
     return calculate_entropy(s) >= threshold
 
 
@@ -414,7 +414,7 @@ SECRET_PATTERNS: list[RedactionRule] = [
         ),
         replacement=r"\1[PASSWORD_REDACTED]\3",
     ),
-    
+
     # Context-based patterns (Authorization headers, env assignments)
     RedactionRule(
         name="auth_bearer",
@@ -466,7 +466,7 @@ class Redactor:
 
     Designed to be efficient for streaming large files.
     Specific patterns take precedence over generic ones.
-    
+
     Features:
     - Built-in patterns for 25+ secret types
     - Custom regex rules via config
@@ -474,7 +474,7 @@ class Redactor:
     - Paranoid mode for maximum security
     - Allowlist support for false positives
     - Structure-safe redaction: source files use line-level redaction
-    
+
     Structure-Safe Redaction:
     For source code files (*.py, *.js, etc.), redaction never injects
     placeholders inline within code. Instead, if a secret is detected
@@ -502,96 +502,96 @@ class Redactor:
         self.enabled = enabled
         self.config = config or RedactionConfig()
         self.current_file = Path(current_file) if current_file else None
-        
+
         # Build pattern list: built-in + config custom + legacy custom
         self.patterns = SECRET_PATTERNS.copy()
-        
+
         if self.config.custom_rules:
             self.patterns.extend(self.config.custom_rules)
-        
+
         if custom_patterns:
             self.patterns.extend(custom_patterns)
 
         # Track redaction stats
         self.redaction_counts: dict[str, int] = {}
-    
+
     def set_current_file(self, path: Path | str | None) -> None:
         """Set the current file being processed."""
         self.current_file = Path(path) if path else None
-    
+
     def _is_file_allowlisted(self) -> bool:
         """Check if current file matches allowlist patterns."""
         if not self.current_file:
             return False
-        
+
         path_str = str(self.current_file)
         name = self.current_file.name
-        
+
         for pattern in self.config.allowlist_patterns:
             if fnmatch(name, pattern) or fnmatch(path_str, pattern):
                 return True
-        
+
         return False
-    
+
     def _is_file_safe(self) -> bool:
         """Check if current file is in the safe file list (for paranoid mode)."""
         if not self.current_file:
             return False
-        
+
         name = self.current_file.name
         path_str = str(self.current_file)
-        
+
         for pattern in self.config.safe_file_patterns:
             if fnmatch(name, pattern) or fnmatch(path_str, pattern):
                 return True
-        
+
         return False
-    
+
     def _is_source_file(self) -> bool:
         """Check if current file is a source code file requiring structure-safe redaction."""
         if not self.current_file or not self.config.structure_safe_redaction:
             return False
-        
+
         name = self.current_file.name
         path_str = str(self.current_file)
-        
+
         for pattern in self.config.source_safe_patterns:
             if fnmatch(name, pattern) or fnmatch(path_str, pattern):
                 return True
-        
+
         return False
-    
+
     def _get_comment_prefix(self) -> str:
         """Get the appropriate comment prefix for the current file type."""
         if not self.current_file:
             return "#"
-        
+
         suffix = self.current_file.suffix.lower()
-        
+
         # Languages using # for comments
         if suffix in {".py", ".pyi", ".rb", ".sh", ".bash", ".zsh", ".yaml", ".yml"}:
             return "#"
-        
+
         # Languages using // for comments
         if suffix in {".js", ".jsx", ".ts", ".tsx", ".go", ".java", ".kt", ".c", ".cpp",
                       ".h", ".hpp", ".cs", ".swift", ".scala", ".rs"}:
             return "//"
-        
+
         # PHP can use both, prefer //
         if suffix == ".php":
             return "//"
-        
+
         # Default to #
         return "#"
-    
+
     def _is_string_allowlisted(self, s: str) -> bool:
         """Check if a specific string is in the allowlist."""
         return s in self.config.allowlist_strings
-    
+
     def _line_has_secret(self, line: str) -> tuple[bool, str]:
         """
         Check if a line contains a secret pattern.
-        
+
         Returns:
             Tuple of (has_secret, rule_name)
         """
@@ -599,31 +599,31 @@ class Redactor:
             if rule.pattern.search(line):
                 return True, rule.name
         return False, ""
-    
+
     def _is_python_file(self) -> bool:
         """Check if current file is a Python file."""
         if not self.current_file:
             return False
         suffix = self.current_file.suffix.lower()
         return suffix in {".py", ".pyi", ".pyx"}
-    
+
     def _redact_source_safe(self, content: str) -> str:
         """
         Apply structure-safe redaction for source code.
-        
+
         For Python files:
         - Uses inline replacement but verifies AST still parses
         - If AST would break, returns original content unmodified
-        
+
         For other source files:
         - Uses inline replacement (JS, Go, etc. don't have as strict
           syntax where inline replacement within strings breaks things)
-        
+
         The key principle: NEVER return syntactically invalid code.
-        
+
         Args:
             content: Full file content
-            
+
         Returns:
             Redacted content that is guaranteed to be syntactically valid
         """
@@ -645,35 +645,35 @@ class Redactor:
             else:
                 # AST parsing failed - return unchanged
                 return content
-        
+
         # For non-Python source files, use inline replacement
         # These languages are more forgiving about string literal changes
         return self._redact_inline(content)
-    
+
     def _redact_line_level(self, content: str) -> str:
         """
         Apply line-level redaction for structure-safe processing.
-        
+
         DEPRECATED: This method is kept for reference but is no longer
         the primary approach. Use _redact_source_safe instead.
-        
+
         Instead of inline replacement, replaces entire lines containing
         secrets with redaction comments. This preserves code syntax
         for simple cases but can break multi-line constructs.
-        
+
         Args:
             content: Full file content
-            
+
         Returns:
             Content with secret-containing lines replaced by comments
         """
         lines = content.splitlines(keepends=True)
         result_lines = []
         comment_prefix = self._get_comment_prefix()
-        
+
         for line in lines:
             has_secret, rule_name = self._line_has_secret(line)
-            
+
             # Also check entropy and paranoid patterns
             if not has_secret and self.config.entropy_enabled:
                 # Check for high-entropy strings in the line
@@ -691,7 +691,7 @@ class Redactor:
                             has_secret = True
                             rule_name = "entropy_detected"
                             break
-            
+
             if not has_secret and self.config.paranoid_mode and not self._is_file_safe():
                 pattern = re.compile(
                     r'\b([A-Za-z0-9+/=_\-]{' + str(self.config.paranoid_min_length) + r',})\b'
@@ -702,7 +702,7 @@ class Redactor:
                         has_secret = True
                         rule_name = "paranoid_redacted"
                         break
-            
+
             if has_secret:
                 # Replace the entire line with a redaction comment
                 # Preserve the line ending
@@ -714,7 +714,7 @@ class Redactor:
                     line_ending = "\n"
                 elif line.endswith("\r"):
                     line_ending = "\r"
-                
+
                 # Get indentation from original line
                 indent = ""
                 for char in stripped:
@@ -722,35 +722,35 @@ class Redactor:
                         indent += char
                     else:
                         break
-                
+
                 redaction_comment = f"{indent}{comment_prefix} [REDACTED: {rule_name}]{line_ending}"
                 result_lines.append(redaction_comment)
-                
+
                 self.redaction_counts[rule_name] = (
                     self.redaction_counts.get(rule_name, 0) + 1
                 )
             else:
                 result_lines.append(line)
-        
+
         return "".join(result_lines)
-    
+
     def _redact_python_ast_safe(self, content: str) -> tuple[str, bool]:
         """
         Apply AST-aware redaction for Python files.
-        
+
         Only redacts within string literals, never modifying identifiers,
         keywords, or structural elements. Falls back to no-op if AST
         parsing fails.
-        
+
         Strategy:
         - Parse the AST to verify code is valid
         - Find secrets in string literals
         - Replace the secret values within strings using inline replacement
         - This preserves function signatures, imports, etc.
-        
+
         Args:
             content: Python source code
-            
+
         Returns:
             Tuple of (redacted_content, success). If success is False,
             the content was returned unmodified.
@@ -760,15 +760,15 @@ class Redactor:
         except SyntaxError:
             # Can't parse - return unchanged to avoid breaking things
             return content, False
-        
+
         # The key insight: we can use inline replacement for Python source
         # because we're only modifying string literal VALUES, not structure.
         # The quotation marks and string boundaries remain intact.
-        
+
         # Apply pattern-based redaction - this works on string contents
         result = content
         had_redaction = False
-        
+
         for rule in self.patterns:
             matches = rule.pattern.findall(result)
             if matches:
@@ -778,7 +778,7 @@ class Redactor:
                 )
                 had_redaction = True
             result = rule.pattern.sub(rule.replacement, result)
-        
+
         # Verify the result still parses
         if had_redaction:
             try:
@@ -788,17 +788,17 @@ class Redactor:
                 # This shouldn't happen if patterns are well-designed,
                 # but we're being defensive
                 return content, False
-        
+
         return result, True
-    
+
     def _redact_inline(self, content: str) -> str:
         """
         Apply inline redaction (original behavior).
-        
+
         Used for non-source files like configs, docs, etc.
         """
         result = content
-        
+
         for rule in self.patterns:
             matches = rule.pattern.findall(result)
             if matches:
@@ -807,31 +807,31 @@ class Redactor:
                     self.redaction_counts.get(rule.name, 0) + count
                 )
             result = rule.pattern.sub(rule.replacement, result)
-        
+
         # Apply entropy-based detection
         result = self._redact_entropy(result)
-        
+
         # Apply paranoid mode
         result = self._redact_paranoid(result)
-        
+
         return result
-    
+
     def _redact_entropy(self, content: str) -> str:
         """Apply entropy-based redaction."""
         if not self.config.entropy_enabled:
             return content
-        
+
         def replace_high_entropy(match: re.Match[str]) -> str:
             value = match.group(1)
-            
+
             # Skip if in allowlist
             if self._is_string_allowlisted(value):
                 return match.group(0)
-            
+
             # Skip if it's a known safe pattern
             if is_safe_value(value):
                 return match.group(0)
-            
+
             # Check entropy
             if is_high_entropy_secret(
                 value,
@@ -842,42 +842,42 @@ class Redactor:
                     self.redaction_counts.get("entropy_detected", 0) + 1
                 )
                 return "[HIGH_ENTROPY_REDACTED]"
-            
+
             return match.group(0)
-        
+
         # Find potential high-entropy strings
         pattern = re.compile(r'\b([A-Za-z0-9+/=_\-]{' + str(self.config.entropy_min_length) + r',})\b')
         return pattern.sub(replace_high_entropy, content)
-    
+
     def _redact_paranoid(self, content: str) -> str:
         """Apply paranoid mode redaction."""
         if not self.config.paranoid_mode:
             return content
-        
+
         # Skip for safe files
         if self._is_file_safe():
             return content
-        
+
         def replace_long_token(match: re.Match[str]) -> str:
             value = match.group(1)
-            
+
             # Skip if in allowlist
             if self._is_string_allowlisted(value):
                 return match.group(0)
-            
+
             # Skip if it's a known safe pattern
             if is_safe_value(value):
                 return match.group(0)
-            
+
             # Skip if already redacted
             if "[REDACTED]" in value or value.startswith("[") and value.endswith("]"):
                 return match.group(0)
-            
+
             self.redaction_counts["paranoid_redacted"] = (
                 self.redaction_counts.get("paranoid_redacted", 0) + 1
             )
             return "[LONG_TOKEN_REDACTED]"
-        
+
         pattern = re.compile(
             r'\b([A-Za-z0-9+/=_\-]{' + str(self.config.paranoid_min_length) + r',})\b'
         )
@@ -891,7 +891,7 @@ class Redactor:
         valid syntax. For Python files, inline replacement is used but
         the result is verified via AST parsing - if parsing would fail,
         the original content is returned unchanged.
-        
+
         For non-source files (configs, docs, etc.), inline replacement
         is used without validation.
 
@@ -903,7 +903,7 @@ class Redactor:
         """
         if not self.enabled:
             return content
-        
+
         # Skip entirely allowlisted files
         if self._is_file_allowlisted():
             return content
@@ -911,7 +911,7 @@ class Redactor:
         # Use structure-safe redaction for source files
         if self._is_source_file():
             return self._redact_source_safe(content)
-        
+
         # Use inline redaction for non-source files
         return self._redact_inline(content)
 
@@ -924,7 +924,7 @@ class Redactor:
         """
         if not self.enabled:
             return line
-        
+
         if self._is_file_allowlisted():
             return line
 
@@ -938,7 +938,7 @@ class Redactor:
                     self.redaction_counts.get(rule.name, 0) + 1
                 )
                 result = rule.pattern.sub(rule.replacement, result)
-        
+
         # Apply advanced detection
         result = self._redact_entropy(result)
         result = self._redact_paranoid(result)
