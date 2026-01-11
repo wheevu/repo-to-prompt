@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
+
 from repo_to_prompt.redactor import (
     RedactionConfig,
     RedactionRule,
@@ -178,7 +180,8 @@ class TestRedactionConfig:
                 {"pattern": r"valid_[A-Z]+"},  # Valid
             ]
         }
-        config = RedactionConfig.from_dict(data)
+        with pytest.warns(RuntimeWarning, match="Invalid redaction regex pattern"):
+            config = RedactionConfig.from_dict(data)
         assert len(config.custom_rules) == 1
 
 

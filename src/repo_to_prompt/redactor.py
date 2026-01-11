@@ -156,6 +156,7 @@ class RedactionConfig:
                     warnings.warn(
                         f"Invalid redaction regex pattern '{rule_data.get('pattern')}' ({exc})",
                         RuntimeWarning,
+                        stacklevel=2,
                     )
 
         # Allowlist
