@@ -5,81 +5,103 @@ on:
     tags:
       - 'v*'
 
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
   build:
-    name: Build distribution
-    runs-on: ubuntu-latest
+    name: Build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            artifact: repo-to-prompt-linux-x86_64
+            binary: repo-to-prompt
+
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-latest
+            artifact: repo-to-prompt-linux-aarch64
+            binary: repo-to-prompt
+
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            artifact: repo-to-prompt-macos-x86_64
+            binary: repo-to-prompt
+
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            artifact: repo-to-prompt-macos-aarch64
+            binary: repo-to-prompt
+
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            artifact: repo-to-prompt-windows-x86_64
+            binary: repo-to-prompt.exe
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
         with:
-          python-version: '3.11'
+          targets: ${{ matrix.target }}
 
-      - name: Install build tools
+      - name: Install musl tools (Linux musl targets)
+        if: contains(matrix.target, 'musl')
         run: |
-          python -m pip install --upgrade pip
-          pip install build twine
+          sudo apt-get update -q
+          sudo apt-get install -y musl-tools
 
-      - name: Build package
-        run: python -m build
+      - name: Install cross-compilation tools (aarch64 Linux)
+        if: matrix.target == 'aarch64-unknown-linux-musl'
+        run: |
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
 
-      - name: Check package
-        run: twine check dist/*
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Upload artifacts
+      - name: Build release binary
+        run: cargo build --release --target ${{ matrix.target }} --verbose
+
+      - name: Package binary (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          cp target/${{ matrix.target }}/release/${{ matrix.binary }} ${{ matrix.artifact }}
+          tar czf ${{ matrix.artifact }}.tar.gz ${{ matrix.artifact }}
+
+      - name: Package binary (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          Copy-Item "target/${{ matrix.target }}/release/${{ matrix.binary }}" "${{ matrix.artifact }}.exe"
+          Compress-Archive -Path "${{ matrix.artifact }}.exe" -DestinationPath "${{ matrix.artifact }}.zip"
+
+      - name: Upload artifact (Unix)
+        if: matrix.os != 'windows-latest'
         uses: actions/upload-artifact@v4
         with:
-          name: dist
-          path: dist/
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}.tar.gz
 
-  # Publish to Test PyPI first (for validation)
-  publish-test:
-    name: Publish to Test PyPI
-    needs: build
-    runs-on: ubuntu-latest
-    environment: test-pypi
-    permissions:
-      id-token: write # Required for trusted publishing
-
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
+      - name: Upload artifact (Windows)
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
         with:
-          name: dist
-          path: dist/
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}.zip
 
-      - name: Publish to Test PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          repository-url: https://test.pypi.org/legacy/
-          skip-existing: true
-
-  # Publish to PyPI (production)
-  publish:
-    name: Publish to PyPI
-    needs: [build, publish-test]
-    runs-on: ubuntu-latest
-    environment: pypi
-    permissions:
-      id-token: write # Required for trusted publishing
-
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: dist
-          path: dist/
-
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-
-  # Create GitHub Release
   github-release:
     name: Create GitHub Release
-    needs: publish
+    needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -87,16 +109,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download artifacts
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          name: dist
-          path: dist/
+          path: artifacts/
+
+      - name: Collect release assets
+        run: find artifacts/ -type f \( -name "*.tar.gz" -o -name "*.zip" \) -exec cp {} . \;
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*
+          files: |
+            *.tar.gz
+            *.zip
           generate_release_notes: true
           draft: false
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
