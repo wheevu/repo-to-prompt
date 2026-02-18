@@ -10,34 +10,24 @@ use std::path::PathBuf;
 pub const REPORT_SCHEMA_VERSION: &str = "1.0.0";
 
 /// Output mode for the tool
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum OutputMode {
     Prompt,
     Rag,
+    #[default]
     Both,
 }
 
-impl Default for OutputMode {
-    fn default() -> Self {
-        Self::Both
-    }
-}
-
 /// Redaction mode controls aggressiveness and syntax safety.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "kebab-case")]
 pub enum RedactionMode {
     Fast,
+    #[default]
     Standard,
     Paranoid,
     StructureSafe,
-}
-
-impl Default for RedactionMode {
-    fn default() -> Self {
-        Self::Standard
-    }
 }
 
 /// Information about a scanned file
