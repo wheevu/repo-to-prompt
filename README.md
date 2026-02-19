@@ -1,11 +1,10 @@
 # repo-to-prompt
 
-*(was previously Python!)*
+*(Was previously Python, which was okay 👍. But now the thing's charged with the Speed Force 🏃🏻💨⚡️)*
 
 Turn a code repository into a tidy “context pack” you can paste into an LLM — or feed into a RAG pipeline.
 
 [![CI](https://github.com/wheevu/repo-to-prompt/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/wheevu/repo-to-prompt/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## What it does
 
@@ -19,7 +18,7 @@ It tries to keep the *important* stuff (READMEs, configs, entrypoints, core sour
 
 ## Why you’d use it
 
--   You want an LLM to help with a repo **without** dumping your whole codebase into chat.
+-   You want an LLM to help with a repo **without** dumping your whole codebase into chat. 🫩
 -   You want **repeatable** outputs (stable ordering + stable chunk IDs).
 -   You want basic protection against accidentally leaking secrets (optional redaction).
 
@@ -127,8 +126,6 @@ By default, `repo-to-prompt` can detect and replace common secrets with placehol
 `[AWS_ACCESS_KEY_REDACTED]`
 
 You can also allowlist paths/strings or add your own patterns via config.
-
-> **Tip:** treat redaction as a safety net, not a license to paste private repos everywhere.
 
 ## Development
 
