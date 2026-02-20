@@ -14,6 +14,7 @@ pub fn render_context_pack(
     stats: &ScanStats,
     tree: &str,
     manifest_info: &HashMap<String, JsonValue>,
+    task_query: Option<&str>,
     include_timestamp: bool,
 ) -> String {
     let mut out = String::new();
@@ -38,7 +39,74 @@ pub fn render_context_pack(
         chunks.len(),
         format_with_commas(stats.total_bytes_included)
     ));
+    if let Some(task) = task_query.filter(|q| !q.trim().is_empty()) {
+        out.push_str(&format!("> Task Context: {}\n", task.trim()));
+    }
     out.push_str("\n---\n\n");
+
+    let mut contribution_files: Vec<&FileInfo> = files
+        .iter()
+        .filter(|f| {
+            f.tags.contains("contribution") || f.relative_path.starts_with(".github/workflows/")
+        })
+        .collect();
+    contribution_files.sort_by(|a, b| a.relative_path.cmp(&b.relative_path));
+    if !contribution_files.is_empty() {
+        out.push_str("## 🤝 Contribution Guide\n\n");
+        out.push_str("**Key contribution files:**\n");
+        for file in contribution_files.iter().take(10) {
+            out.push_str(&format!("- `{}`\n", file.relative_path));
+        }
+
+        let mut suggested_commands: Vec<String> = Vec::new();
+        for file in &contribution_files {
+            if let Ok((content, _)) = read_file_safe(&file.path, Some(10_000), None) {
+                for line in content.lines() {
+                    let trimmed = line.trim();
+                    if trimmed.is_empty() || trimmed.len() > 120 {
+                        continue;
+                    }
+                    if [
+                        "cargo test",
+                        "cargo build",
+                        "npm test",
+                        "pnpm test",
+                        "yarn test",
+                        "pytest",
+                        "go test",
+                        "make test",
+                        "just test",
+                    ]
+                    .iter()
+                    .any(|needle| trimmed.contains(needle))
+                    {
+                        suggested_commands.push(trimmed.to_string());
+                    }
+                }
+            }
+        }
+        suggested_commands.sort();
+        suggested_commands.dedup();
+        if !suggested_commands.is_empty() {
+            out.push_str("\n**Build/Test commands (detected):**\n");
+            for command in suggested_commands.iter().take(8) {
+                out.push_str(&format!("- `{}`\n", command));
+            }
+        }
+
+        let workflow_files: Vec<&FileInfo> = contribution_files
+            .iter()
+            .copied()
+            .filter(|f| f.relative_path.starts_with(".github/workflows/"))
+            .collect();
+        if !workflow_files.is_empty() {
+            out.push_str("\n**How changes are reviewed (CI/workflows):**\n");
+            for workflow in workflow_files.iter().take(5) {
+                out.push_str(&format!("- `{}`\n", workflow.relative_path));
+            }
+        }
+        out.push('\n');
+    }
 
     // ── Repository Overview ──────────────────────────────────────────────────
     out.push_str("## 📋 Repository Overview\n\n");

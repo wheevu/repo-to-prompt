@@ -3,9 +3,12 @@
 use crate::chunk::line_chunker::LineChunker;
 use crate::domain::{Chunk, FileInfo};
 use crate::utils::{estimate_tokens, stable_hash};
+use std::collections::{BTreeSet, HashMap};
 use tree_sitter::{Language, Parser};
 
 pub struct CodeChunker;
+
+type SymbolTagsByBoundary = HashMap<usize, BTreeSet<String>>;
 
 pub fn supported_tree_sitter_languages() -> &'static [&'static str] {
     &["python", "rust", "javascript", "typescript", "go"]
@@ -46,6 +49,7 @@ impl CodeChunker {
             return LineChunker::new().chunk(file_info, content, max_tokens, overlap_tokens);
         }
 
+        let symbol_tags = find_boundary_symbol_tags(&lines, &file_info.language, &boundaries);
         let mut chunks = Vec::new();
         let line_chunker = LineChunker::new();
 
@@ -61,6 +65,13 @@ impl CodeChunker {
                 continue;
             }
 
+            let mut section_tags = file_info.tags.clone();
+            section_tags
+                .extend(extract_symbol_tags_from_section(&file_info.language, &section_content));
+            if let Some(boundary_tags) = symbol_tags.get(&start) {
+                section_tags.extend(boundary_tags.iter().cloned());
+            }
+
             if estimate_tokens(&section_content) <= max_tokens {
                 chunks.push(Chunk {
                     id: stable_hash(&section_content, &file_info.relative_path, start + 1, end),
@@ -71,7 +82,7 @@ impl CodeChunker {
                     token_estimate: estimate_tokens(&section_content),
                     content: section_content,
                     priority: file_info.priority,
-                    tags: file_info.tags.clone(),
+                    tags: section_tags,
                 });
             } else {
                 let nested =
@@ -81,6 +92,7 @@ impl CodeChunker {
                     chunk.end_line += start;
                     chunk.id =
                         stable_hash(&chunk.content, &chunk.path, chunk.start_line, chunk.end_line);
+                    chunk.tags.extend(section_tags.iter().cloned());
                     chunks.push(chunk);
                 }
             }
@@ -155,6 +167,7 @@ fn chunk_with_tree_sitter(
     }
 
     let mut boundaries = vec![0usize];
+    let mut symbol_tags: SymbolTagsByBoundary = HashMap::new();
     for i in 0..root.named_child_count() {
         if let Some(child) = root.named_child(i) {
             let kind = child.kind();
@@ -162,6 +175,11 @@ fn chunk_with_tree_sitter(
                 let row = child.start_position().row;
                 if row > 0 {
                     boundaries.push(row);
+                }
+                let tags =
+                    extract_symbol_tags_from_tree_node(content, file_info.language.as_str(), child);
+                if !tags.is_empty() {
+                    symbol_tags.entry(row).or_default().extend(tags);
                 }
             }
         }
@@ -174,13 +192,21 @@ fn chunk_with_tree_sitter(
         return Some(Vec::new());
     }
 
-    Some(chunk_by_boundaries(file_info, &lines, &boundaries, max_tokens, overlap_tokens))
+    Some(chunk_by_boundaries(
+        file_info,
+        &lines,
+        &boundaries,
+        &symbol_tags,
+        max_tokens,
+        overlap_tokens,
+    ))
 }
 
 fn chunk_by_boundaries(
     file_info: &FileInfo,
     lines: &[&str],
     boundaries: &[usize],
+    symbol_tags: &SymbolTagsByBoundary,
     max_tokens: usize,
     overlap_tokens: usize,
 ) -> Vec<Chunk> {
@@ -199,6 +225,13 @@ fn chunk_by_boundaries(
             continue;
         }
 
+        let mut section_tags = file_info.tags.clone();
+        section_tags
+            .extend(extract_symbol_tags_from_section(&file_info.language, &section_content));
+        if let Some(boundary_tags) = symbol_tags.get(&start) {
+            section_tags.extend(boundary_tags.iter().cloned());
+        }
+
         if estimate_tokens(&section_content) <= max_tokens {
             chunks.push(Chunk {
                 id: stable_hash(&section_content, &file_info.relative_path, start + 1, end),
@@ -209,7 +242,7 @@ fn chunk_by_boundaries(
                 token_estimate: estimate_tokens(&section_content),
                 content: section_content,
                 priority: file_info.priority,
-                tags: file_info.tags.clone(),
+                tags: section_tags,
             });
         } else {
             let nested =
@@ -219,6 +252,7 @@ fn chunk_by_boundaries(
                 chunk.end_line += start;
                 chunk.id =
                     stable_hash(&chunk.content, &chunk.path, chunk.start_line, chunk.end_line);
+                chunk.tags.extend(section_tags.iter().cloned());
                 chunks.push(chunk);
             }
         }
@@ -284,6 +318,160 @@ fn find_definition_boundaries(lines: &[&str], language: &str) -> Vec<usize> {
     boundaries
 }
 
+fn find_boundary_symbol_tags(
+    lines: &[&str],
+    language: &str,
+    boundaries: &[usize],
+) -> SymbolTagsByBoundary {
+    let mut tags = HashMap::new();
+    for &start in boundaries {
+        if start >= lines.len() {
+            continue;
+        }
+        let line = lines[start];
+        let symbol_tags = extract_symbol_tags_from_line(language, line);
+        if !symbol_tags.is_empty() {
+            tags.insert(start, symbol_tags);
+        }
+    }
+    tags
+}
+
+fn extract_symbol_tags_from_tree_node(
+    content: &str,
+    language: &str,
+    node: tree_sitter::Node<'_>,
+) -> BTreeSet<String> {
+    let mut tags = BTreeSet::new();
+    let kind = node.kind();
+
+    let prefix = match (language, kind) {
+        (
+            _,
+            "function_definition"
+            | "function_item"
+            | "function_declaration"
+            | "method_definition"
+            | "method_declaration",
+        ) => Some("def"),
+        (
+            _,
+            "class_definition"
+            | "class_declaration"
+            | "struct_item"
+            | "enum_item"
+            | "trait_item"
+            | "interface_declaration"
+            | "type_alias_declaration"
+            | "type_declaration",
+        ) => Some("type"),
+        ("rust", "impl_item") => Some("impl"),
+        _ => None,
+    };
+
+    if let Some(prefix) = prefix {
+        if let Some(name) = extract_node_name(content, node) {
+            tags.insert(format!("{prefix}:{name}"));
+            return tags;
+        }
+    }
+
+    if let Ok(text) = node.utf8_text(content.as_bytes()) {
+        tags.extend(extract_symbol_tags_from_section(language, text));
+    }
+    tags
+}
+
+fn extract_node_name(content: &str, node: tree_sitter::Node<'_>) -> Option<String> {
+    if let Some(name_node) = node.child_by_field_name("name") {
+        if let Ok(text) = name_node.utf8_text(content.as_bytes()) {
+            if let Some(clean) = clean_symbol_name(text) {
+                return Some(clean);
+            }
+        }
+    }
+
+    for i in 0..node.named_child_count() {
+        if let Some(child) = node.named_child(i) {
+            let kind = child.kind();
+            if kind.contains("identifier") {
+                if let Ok(text) = child.utf8_text(content.as_bytes()) {
+                    if let Some(clean) = clean_symbol_name(text) {
+                        return Some(clean);
+                    }
+                }
+            }
+        }
+    }
+
+    None
+}
+
+fn extract_symbol_tags_from_section(language: &str, section: &str) -> BTreeSet<String> {
+    let mut tags = BTreeSet::new();
+    let Some(first_code_line) = section
+        .lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty() && !line.starts_with('@') && !line.starts_with("//"))
+    else {
+        return tags;
+    };
+
+    tags.extend(extract_symbol_tags_from_line(language, first_code_line));
+    tags
+}
+
+fn extract_symbol_tags_from_line(language: &str, line: &str) -> BTreeSet<String> {
+    let mut tags = BTreeSet::new();
+    let trimmed = line.trim();
+
+    let patterns: &[(&str, &str)] = match language {
+        "python" => &[("def ", "def"), ("async def ", "def"), ("class ", "type")],
+        "rust" => &[
+            ("pub fn ", "def"),
+            ("fn ", "def"),
+            ("struct ", "type"),
+            ("enum ", "type"),
+            ("trait ", "type"),
+            ("impl ", "impl"),
+        ],
+        "javascript" | "typescript" => &[
+            ("export function ", "def"),
+            ("function ", "def"),
+            ("class ", "type"),
+            ("export class ", "type"),
+            ("interface ", "type"),
+            ("type ", "type"),
+            ("const ", "def"),
+            ("let ", "def"),
+        ],
+        "go" => &[("func ", "def"), ("type ", "type"), ("const ", "def"), ("var ", "def")],
+        _ => &[("def ", "def"), ("fn ", "def"), ("class ", "type")],
+    };
+
+    for (prefix, kind) in patterns {
+        if let Some(rest) = trimmed.strip_prefix(prefix) {
+            if let Some(name) = clean_symbol_name(rest) {
+                tags.insert(format!("{kind}:{name}"));
+                break;
+            }
+        }
+    }
+
+    tags
+}
+
+fn clean_symbol_name(raw: &str) -> Option<String> {
+    let candidate: String =
+        raw.chars().take_while(|c| c.is_alphanumeric() || matches!(c, '_' | ':' | '.')).collect();
+    let cleaned = candidate.trim_end_matches([':', '.']).to_string();
+    if cleaned.is_empty() {
+        None
+    } else {
+        Some(cleaned)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::CodeChunker;
@@ -313,6 +501,7 @@ mod tests {
         assert!(!chunks.is_empty());
         assert!(chunks.len() >= 2);
         assert!(chunks[0].start_line >= 1);
+        assert!(chunks.iter().any(|c| c.tags.contains("def:a")));
     }
 
     #[test]
@@ -336,6 +525,8 @@ mod tests {
         let chunks = CodeChunker::new().chunk(&info, content, 20, 0);
         assert!(!chunks.is_empty());
         assert!(chunks.len() >= 2);
+        assert!(chunks.iter().any(|c| c.tags.iter().any(|t| t.starts_with("def:a"))));
+        assert!(chunks.iter().any(|c| c.tags.iter().any(|t| t.starts_with("type:S"))));
     }
 
     #[test]
@@ -359,5 +550,6 @@ mod tests {
         let chunks = CodeChunker::new().chunk(&info, content, 20, 0);
         assert!(!chunks.is_empty());
         assert!(chunks.len() >= 2);
+        assert!(chunks.iter().any(|c| c.tags.contains("def:a")));
     }
 }

@@ -17,6 +17,7 @@ pub struct CliOverrides {
     pub follow_symlinks: Option<bool>,
     pub skip_minified: Option<bool>,
     pub max_tokens: Option<usize>,
+    pub task_query: Option<String>,
     pub chunk_tokens: Option<usize>,
     pub chunk_overlap: Option<usize>,
     pub min_chunk_tokens: Option<usize>,
@@ -65,6 +66,9 @@ pub fn merge_cli_with_config(mut base_config: Config, cli: CliOverrides) -> Conf
 
     if let Some(max_tokens) = cli.max_tokens {
         base_config.max_tokens = Some(max_tokens);
+    }
+    if let Some(task_query) = cli.task_query {
+        base_config.task_query = Some(task_query);
     }
     if let Some(chunk_tokens) = cli.chunk_tokens {
         base_config.chunk_tokens = chunk_tokens;

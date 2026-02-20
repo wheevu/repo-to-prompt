@@ -2,6 +2,7 @@
 
 use assert_cmd::Command;
 use predicates::prelude::*;
+use tempfile::TempDir;
 
 #[test]
 fn test_cli_version() {
@@ -51,4 +52,23 @@ fn test_info_reports_tree_sitter_capabilities() {
     let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("repo-to-prompt"));
     cmd.args(["info", "."]);
     cmd.assert().success().stdout(predicate::str::contains("Statistics:"));
+}
+
+#[test]
+fn test_export_accepts_contribution_mode() {
+    let out = TempDir::new().expect("temp out dir");
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("repo-to-prompt"));
+    cmd.args([
+        "export",
+        "--path",
+        ".",
+        "--mode",
+        "contribution",
+        "--max-tokens",
+        "10",
+        "--output-dir",
+        out.path().to_str().expect("utf8 path"),
+        "--no-timestamp",
+    ]);
+    cmd.assert().success();
 }

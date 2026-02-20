@@ -105,7 +105,9 @@ expression: normalized_report
     "redact_secrets": true,
     "ref": null,
     "repo": null,
+    "reranking": null,
     "skip_minified": true,
+    "task_query": null,
     "tree_depth": 4
   },
   "files": [

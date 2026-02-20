@@ -21,6 +21,9 @@ const IMPORTANT_DOC_FILES: &[&str] = &[
     "documentation/index.md",
 ];
 
+const CONTRIBUTION_DOC_PREFIXES: &[&str] =
+    &["contributing", "code_of_conduct", "security", "authors", "maintainers"];
+
 const IMPORTANT_CONFIG_FILES: &[&str] = &[
     "pyproject.toml",
     "package.json",
@@ -87,6 +90,8 @@ impl FileRanker {
         let mut priority: f64 = self.weights.default;
         if file.is_readme {
             priority = self.weights.readme;
+        } else if is_contribution_doc(&rel_normalized, &name) {
+            priority = self.weights.contribution_doc;
         } else if is_important_doc(&rel_normalized, &name) {
             priority = self.weights.main_doc;
         } else if is_vendored(&file.path) {
@@ -95,6 +100,8 @@ impl FileRanker {
             priority = self.weights.lock_file;
         } else if is_likely_generated(&file.path, &content_sample) {
             priority = self.weights.generated;
+        } else if is_ci_workflow(&rel_lower) {
+            priority = self.weights.config;
         } else if file.is_config {
             priority = self.weights.config;
         } else if self.entrypoints.contains(&rel_normalized) || is_common_entrypoint(&name) {
@@ -116,6 +123,12 @@ impl FileRanker {
         }
         if file.is_config {
             file.tags.insert("config".to_string());
+        }
+        if is_contribution_doc(&rel_normalized, &name) {
+            file.tags.insert("contribution".to_string());
+        }
+        if is_ci_workflow(&rel_lower) {
+            file.tags.insert("workflow".to_string());
         }
         // NOTE: Python does NOT add a "docs" tag in rank_file — is_doc only affects
         // priority score. We intentionally omit the "docs" tag to match Python behavior.
@@ -371,6 +384,23 @@ fn is_important_doc(rel: &str, name: &str) -> bool {
         || IMPORTANT_DOC_FILES.iter().any(|d| d.to_lowercase() == name.to_lowercase())
 }
 
+fn is_contribution_doc(rel: &str, name: &str) -> bool {
+    let rel_lower = rel.to_lowercase();
+    let name_lower = name.to_lowercase();
+    if rel_lower.starts_with(".github/pull_request_template")
+        || rel_lower.starts_with(".github/issue_template/")
+    {
+        return true;
+    }
+    CONTRIBUTION_DOC_PREFIXES
+        .iter()
+        .any(|prefix| name_lower.starts_with(prefix) || rel_lower.contains(&format!("/{prefix}")))
+}
+
+fn is_ci_workflow(rel: &str) -> bool {
+    rel.starts_with(".github/workflows/")
+}
+
 fn is_config_file(name: &str, rel: &str) -> bool {
     IMPORTANT_CONFIG_FILES.contains(&rel) || IMPORTANT_CONFIG_FILES.contains(&name)
 }
@@ -439,5 +469,25 @@ mod tests {
         ranker.rank_file(&mut test_file);
 
         assert!(readme.priority > test_file.priority);
+    }
+
+    #[test]
+    fn contribution_doc_ranks_higher_than_config() {
+        let tmp = TempDir::new().expect("tmp");
+        let contributing_path = tmp.path().join("CONTRIBUTING.md");
+        let cargo_path = tmp.path().join("Cargo.toml");
+        fs::write(&contributing_path, "# Contributing\n").expect("write contributing");
+        fs::write(&cargo_path, "[package]\nname='x'\nversion='0.1.0'\n").expect("write cargo");
+
+        let scanned = HashSet::from(["CONTRIBUTING.md".to_string(), "Cargo.toml".to_string()]);
+        let ranker = FileRanker::new(tmp.path(), scanned);
+
+        let mut contributing = make_file(&contributing_path, "CONTRIBUTING.md", ".md", "markdown");
+        let mut cargo = make_file(&cargo_path, "Cargo.toml", ".toml", "toml");
+        ranker.rank_file(&mut contributing);
+        ranker.rank_file(&mut cargo);
+
+        assert!(contributing.priority > cargo.priority);
+        assert!(contributing.tags.contains("contribution"));
     }
 }

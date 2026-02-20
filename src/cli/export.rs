@@ -2,6 +2,7 @@
 
 use anyhow::Result;
 use clap::Args;
+use globset::{Glob, GlobSet, GlobSetBuilder};
 use serde_json::json;
 use std::collections::HashSet;
 use std::fs;
@@ -14,7 +15,7 @@ use crate::chunk::{chunk_content, coalesce_small_chunks_with_max};
 use crate::config::{load_config, merge_cli_with_config, CliOverrides};
 use crate::domain::{Chunk, OutputMode, RedactionMode};
 use crate::fetch::fetch_repository;
-use crate::rank::rank_files_with_manifest;
+use crate::rank::{rank_files_with_manifest, rerank_chunks_by_task};
 use crate::redact::Redactor;
 use crate::render::{render_context_pack, render_jsonl, write_report};
 use crate::scan::scanner::FileScanner;
@@ -71,6 +72,10 @@ pub struct ExportArgs {
     #[arg(short = 't', long, value_name = "TOKENS")]
     pub max_tokens: Option<usize>,
 
+    /// Task description for retrieval-driven reranking
+    #[arg(long, value_name = "TEXT")]
+    pub task: Option<String>,
+
     /// Target tokens per chunk
     #[arg(long, value_name = "TOKENS")]
     pub chunk_tokens: Option<usize>,
@@ -83,7 +88,7 @@ pub struct ExportArgs {
     #[arg(long, value_name = "TOKENS")]
     pub min_chunk_tokens: Option<usize>,
 
-    /// Output format: 'prompt' (Markdown), 'rag' (JSONL), or 'both'
+    /// Output format: 'prompt' (Markdown), 'rag' (JSONL), 'contribution', or 'both'
     #[arg(short = 'm', long, value_name = "MODE")]
     pub mode: Option<String>,
 
@@ -149,6 +154,7 @@ pub fn run(args: ExportArgs) -> Result<()> {
         follow_symlinks: if args.follow_symlinks { Some(true) } else { None },
         skip_minified: if args.include_minified { Some(false) } else { None },
         max_tokens: args.max_tokens,
+        task_query: args.task.clone(),
         chunk_tokens: args.chunk_tokens,
         chunk_overlap: args.chunk_overlap,
         min_chunk_tokens: args.min_chunk_tokens,
@@ -159,7 +165,15 @@ pub fn run(args: ExportArgs) -> Result<()> {
         redaction_mode,
     };
 
-    let merged = merge_cli_with_config(file_config, cli_overrides);
+    let mut merged = merge_cli_with_config(file_config, cli_overrides);
+
+    if matches!(merged.mode, OutputMode::Contribution) {
+        for pattern in default_contribution_patterns() {
+            if !merged.always_include_patterns.contains(&pattern) {
+                merged.always_include_patterns.push(pattern);
+            }
+        }
+    }
 
     if merged.path.is_none() && merged.repo_url.is_none() {
         anyhow::bail!("Either --path or --repo must be specified");
@@ -206,9 +220,11 @@ pub fn run(args: ExportArgs) -> Result<()> {
     } else {
         None
     };
+    let always_include = build_globset(&merged.always_include_patterns)?;
     let mut chunks: Vec<Chunk> = Vec::new();
     // Track token budget at file granularity (matching Python behaviour).
     let mut total_tokens_so_far: usize = 0;
+    let mut forced_token_files: usize = 0;
 
     for file in &mut selected_files {
         // Read the full file content once.
@@ -262,7 +278,9 @@ pub fn run(args: ExportArgs) -> Result<()> {
 
         // Token budget check at file granularity — matches Python cli.py:530-539.
         if let Some(max_tokens) = merged.max_tokens {
-            if total_tokens_so_far + file_tokens > max_tokens {
+            let is_always_include =
+                always_include.as_ref().map(|g| g.is_match(&file.relative_path)).unwrap_or(false);
+            if total_tokens_so_far + file_tokens > max_tokens && !is_always_include {
                 stats.files_dropped_budget += 1;
                 stats.dropped_files.push(std::collections::HashMap::from([
                     ("path".to_string(), json!(file.relative_path)),
@@ -271,6 +289,9 @@ pub fn run(args: ExportArgs) -> Result<()> {
                     ("tokens".to_string(), json!(file_tokens)),
                 ]));
                 continue;
+            }
+            if total_tokens_so_far + file_tokens > max_tokens && is_always_include {
+                forced_token_files += 1;
             }
         }
         total_tokens_so_far += file_tokens;
@@ -292,6 +313,41 @@ pub fn run(args: ExportArgs) -> Result<()> {
     let min_chunk_tokens = merged.min_chunk_tokens;
     chunks = coalesce_small_chunks_with_max(chunks, min_chunk_tokens, chunk_tokens);
 
+    if let Some(task_query) = merged.task_query.as_deref() {
+        let file_scores = rerank_chunks_by_task(&mut chunks, task_query, 0.4);
+        chunks.sort_by(|a, b| {
+            b.priority
+                .partial_cmp(&a.priority)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.path.cmp(&b.path))
+                .then_with(|| a.start_line.cmp(&b.start_line))
+        });
+
+        for file in &mut selected_files {
+            if let Some(task_score) = file_scores.get(&file.relative_path) {
+                file.priority =
+                    (((file.priority * 0.6) + (task_score * 0.4)) * 1000.0).round() / 1000.0;
+            }
+        }
+        selected_files.sort_by(|a, b| {
+            b.priority
+                .partial_cmp(&a.priority)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.relative_path.cmp(&b.relative_path))
+        });
+
+        stats.top_ranked_files = selected_files
+            .iter()
+            .take(20)
+            .map(|f| {
+                std::collections::HashMap::from([
+                    ("path".to_string(), json!(f.relative_path)),
+                    ("priority".to_string(), json!(f.priority)),
+                ])
+            })
+            .collect();
+    }
+
     stats.chunks_created = chunks.len();
     stats.total_tokens_estimated = chunks.iter().map(|c| c.token_estimate).sum();
 
@@ -312,17 +368,18 @@ pub fn run(args: ExportArgs) -> Result<()> {
         &stats,
         &tree,
         &manifest_info,
+        merged.task_query.as_deref(),
         !args.no_timestamp,
     );
     let jsonl = render_jsonl(&chunks);
 
     let mut output_files = Vec::new();
-    if matches!(merged.mode, OutputMode::Prompt | OutputMode::Both) {
+    if matches!(merged.mode, OutputMode::Prompt | OutputMode::Both | OutputMode::Contribution) {
         let p = output_dir.join("context_pack.md");
         fs::write(&p, context_pack)?;
         output_files.push(p.display().to_string());
     }
-    if matches!(merged.mode, OutputMode::Rag | OutputMode::Both) {
+    if matches!(merged.mode, OutputMode::Rag | OutputMode::Both | OutputMode::Contribution) {
         let p = output_dir.join("chunks.jsonl");
         fs::write(&p, jsonl)?;
         output_files.push(p.display().to_string());
@@ -332,7 +389,7 @@ pub fn run(args: ExportArgs) -> Result<()> {
     // Record processing time before writing the report so the value is correct in report.json.
     stats.processing_time_seconds = start_time.elapsed().as_secs_f64();
 
-    // Build curated 14-key config dict matching Python's report schema exactly.
+    // Build curated config dict for report.json.
     let config_dict = {
         let exclude_globs_val = if merged.exclude_globs.is_empty() {
             serde_json::Value::Null
@@ -354,6 +411,7 @@ pub fn run(args: ExportArgs) -> Result<()> {
             .map(|p| serde_json::Value::String(p.to_string_lossy().to_string()))
             .unwrap_or(serde_json::Value::Null);
         let mode_val = serde_json::to_value(merged.mode)?;
+        let task_val = merged.task_query.clone();
         json!({
             "chunk_overlap":        merged.chunk_overlap,
             "chunk_tokens":         merged.chunk_tokens,
@@ -365,6 +423,8 @@ pub fn run(args: ExportArgs) -> Result<()> {
             "max_total_bytes":      merged.max_total_bytes,
             "mode":                 mode_val,
             "path":                 path_val,
+            "task_query":           task_val,
+            "reranking":            if merged.task_query.is_some() { json!("bm25+deps") } else { serde_json::Value::Null },
             "redact_secrets":       merged.redact_secrets,
             "ref":                  merged.ref_.clone(),
             "repo":                 merged.repo_url.clone(),
@@ -421,10 +481,22 @@ pub fn run(args: ExportArgs) -> Result<()> {
     if stats.files_dropped_budget > 0 {
         println!("  Files dropped (budget): {}", stats.files_dropped_budget);
     }
+    if forced_token_files > 0 {
+        if let Some(max_tokens) = merged.max_tokens {
+            let overflow = total_tokens_so_far.saturating_sub(max_tokens);
+            println!(
+                "  Warning: forced {} always-include file(s), token budget exceeded by ~{}",
+                forced_token_files, overflow
+            );
+        }
+    }
 
     println!("  Chunks created:  {}", stats.chunks_created);
     println!("  Total bytes:     {}", stats.total_bytes_included);
     println!("  Total tokens:    ~{}", stats.total_tokens_estimated);
+    if let Some(task_query) = merged.task_query.as_deref() {
+        println!("  Task reranking:  bm25+deps ({task_query})");
+    }
     println!("  Processing time: {:.2}s", stats.processing_time_seconds);
 
     println!();
@@ -482,9 +554,37 @@ fn parse_mode(mode: Option<&str>) -> Result<OutputMode> {
     match mode.unwrap_or("both").to_ascii_lowercase().as_str() {
         "prompt" => Ok(OutputMode::Prompt),
         "rag" => Ok(OutputMode::Rag),
+        "contribution" => Ok(OutputMode::Contribution),
         "both" => Ok(OutputMode::Both),
-        invalid => anyhow::bail!("Invalid mode '{invalid}'. Use: prompt|rag|both"),
+        invalid => anyhow::bail!("Invalid mode '{invalid}'. Use: prompt|rag|contribution|both"),
     }
+}
+
+fn default_contribution_patterns() -> Vec<String> {
+    [
+        "CONTRIBUTING*",
+        "CODE_OF_CONDUCT*",
+        "SECURITY*",
+        "AUTHORS*",
+        "MAINTAINERS*",
+        ".github/PULL_REQUEST_TEMPLATE*",
+        ".github/ISSUE_TEMPLATE/**",
+        ".github/workflows/**",
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .collect()
+}
+
+fn build_globset(patterns: &[String]) -> Result<Option<GlobSet>> {
+    if patterns.is_empty() {
+        return Ok(None);
+    }
+    let mut builder = GlobSetBuilder::new();
+    for pattern in patterns {
+        builder.add(Glob::new(pattern)?);
+    }
+    Ok(Some(builder.build()?))
 }
 
 fn parse_redaction_mode(mode: Option<&str>) -> Result<RedactionMode> {

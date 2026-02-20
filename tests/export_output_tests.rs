@@ -82,6 +82,35 @@ fn report_processing_time_is_nonzero() {
     );
 }
 
+#[test]
+fn export_task_reranking_is_recorded_in_report() {
+    let fixture = TestRepo::new();
+    let out_base = TempDir::new().expect("temp out");
+    let out = out_base.path().join("out");
+
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("repo-to-prompt"));
+    cmd.args([
+        "export",
+        "--path",
+        fixture.root().to_str().expect("repo str"),
+        "--mode",
+        "both",
+        "--task",
+        "guide documentation",
+        "--output-dir",
+        out.to_str().expect("out str"),
+        "--no-timestamp",
+    ]);
+    cmd.assert().success();
+
+    let actual = resolve_output_dir(&out, fixture.root());
+    let report_raw = fs::read_to_string(actual.join("report.json")).expect("read report");
+    let report: serde_json::Value = serde_json::from_str(&report_raw).expect("parse report");
+
+    assert_eq!(report["config"]["task_query"], serde_json::json!("guide documentation"));
+    assert_eq!(report["config"]["reranking"], serde_json::json!("bm25+deps"));
+}
+
 fn run_export(repo_root: &Path, output_dir: &Path) {
     let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("repo-to-prompt"));
     cmd.args([

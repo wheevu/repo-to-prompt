@@ -15,6 +15,7 @@ pub const REPORT_SCHEMA_VERSION: &str = "1.0.0";
 pub enum OutputMode {
     Prompt,
     Rag,
+    Contribution,
     #[default]
     Both,
 }
@@ -406,6 +407,8 @@ fn default_source_safe_patterns() -> Vec<String> {
 pub struct RankingWeights {
     #[serde(default = "w_readme")]
     pub readme: f64,
+    #[serde(default = "w_contribution_doc")]
+    pub contribution_doc: f64,
     #[serde(default = "w_main_doc")]
     pub main_doc: f64,
     #[serde(default = "w_config")]
@@ -434,6 +437,7 @@ impl Default for RankingWeights {
     fn default() -> Self {
         Self {
             readme: w_readme(),
+            contribution_doc: w_contribution_doc(),
             main_doc: w_main_doc(),
             config: w_config(),
             entrypoint: w_entrypoint(),
@@ -451,6 +455,9 @@ impl Default for RankingWeights {
 
 fn w_readme() -> f64 {
     1.00
+}
+fn w_contribution_doc() -> f64 {
+    0.98
 }
 fn w_main_doc() -> f64 {
     0.95
@@ -649,6 +656,10 @@ pub struct Config {
     // Token budget
     pub max_tokens: Option<usize>,
 
+    /// Optional task description used for retrieval-driven reranking.
+    #[serde(default)]
+    pub task_query: Option<String>,
+
     // Chunking options
     #[serde(default = "default_chunk_tokens")]
     pub chunk_tokens: usize,
@@ -675,6 +686,10 @@ pub struct Config {
     #[serde(default)]
     pub redaction_mode: RedactionMode,
 
+    /// Glob patterns that should always be included even when token budget is exceeded.
+    #[serde(default)]
+    pub always_include_patterns: Vec<String>,
+
     /// Custom ranking weights (all fields optional; defaults match Python)
     #[serde(default, alias = "weights")]
     pub ranking_weights: RankingWeights,
@@ -698,6 +713,7 @@ impl Default for Config {
             follow_symlinks: false,
             skip_minified: true,
             max_tokens: None,
+            task_query: None,
             chunk_tokens: default_chunk_tokens(),
             chunk_overlap: default_chunk_overlap(),
             min_chunk_tokens: default_min_chunk_tokens(),
@@ -706,6 +722,7 @@ impl Default for Config {
             tree_depth: default_tree_depth(),
             redact_secrets: true,
             redaction_mode: RedactionMode::Standard,
+            always_include_patterns: Vec::new(),
             ranking_weights: RankingWeights::default(),
             redaction: RedactionConfig::default(),
         }
