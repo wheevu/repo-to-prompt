@@ -10,6 +10,7 @@ mod cli;
 mod config;
 mod domain;
 mod fetch;
+mod lsp;
 mod rank;
 mod redact;
 mod render;

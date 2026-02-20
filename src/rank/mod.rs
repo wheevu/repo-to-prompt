@@ -49,6 +49,14 @@ pub fn rerank_chunks_by_task(
         }
     }
 
+    let symbol_expansion = symbol_expansion_scores(chunks, query);
+    for chunk in chunks.iter_mut() {
+        if let Some(expanded) = symbol_expansion.get(&chunk.path) {
+            let boosted = (chunk.priority * 0.7) + (expanded * 0.3);
+            chunk.priority = (boosted * 1000.0).round() / 1000.0;
+        }
+    }
+
     file_scores.clear();
     for chunk in chunks.iter() {
         file_scores
@@ -101,6 +109,107 @@ fn dependency_expansion_scores(
     }
 
     expanded
+}
+
+fn symbol_expansion_scores(chunks: &[Chunk], query: &str) -> HashMap<String, f64> {
+    let symbol_defs = symbol_definitions(chunks);
+    if symbol_defs.is_empty() {
+        return HashMap::new();
+    }
+
+    let query_tokens: HashSet<String> = tokenize(query).into_iter().collect();
+    if query_tokens.is_empty() {
+        return HashMap::new();
+    }
+
+    let mut hits: HashSet<String> = HashSet::new();
+    for symbol in symbol_defs.keys() {
+        if query_matches_symbol(&query_tokens, symbol) {
+            hits.insert(symbol.clone());
+        }
+    }
+
+    if hits.is_empty() {
+        return HashMap::new();
+    }
+
+    let mut header_by_file: HashMap<&str, usize> = HashMap::new();
+    for chunk in chunks {
+        header_by_file
+            .entry(chunk.path.as_str())
+            .and_modify(|line| *line = (*line).min(chunk.start_line))
+            .or_insert(chunk.start_line);
+    }
+
+    let mut scores: HashMap<String, f64> = HashMap::new();
+    for symbol in hits {
+        let mut def_files: HashSet<&str> = HashSet::new();
+        if let Some(files) = symbol_defs.get(&symbol) {
+            for file in files {
+                def_files.insert(file.as_str());
+                scores.entry(file.clone()).and_modify(|s| *s = s.max(1.0)).or_insert(1.0);
+            }
+        }
+
+        for chunk in chunks {
+            let path = chunk.path.as_str();
+            let token_set: HashSet<String> = tokenize(&chunk.content).into_iter().collect();
+            if !token_set.contains(&symbol) {
+                continue;
+            }
+
+            if def_files.contains(path) {
+                let header_line = header_by_file.get(path).copied().unwrap_or(chunk.start_line);
+                if chunk.start_line == header_line {
+                    scores.entry(chunk.path.clone()).and_modify(|s| *s = s.max(1.0)).or_insert(1.0);
+                }
+                if chunk.tags.iter().any(|t| t.starts_with("type:") || t.starts_with("impl:")) {
+                    scores
+                        .entry(chunk.path.clone())
+                        .and_modify(|s| *s = s.max(0.95))
+                        .or_insert(0.95);
+                }
+                continue;
+            }
+
+            let is_test = is_test_like_file(path) || chunk.tags.iter().any(|t| t == "test");
+            let caller_score = if is_test { 0.9 } else { 0.8 };
+            scores
+                .entry(chunk.path.clone())
+                .and_modify(|s| *s = s.max(caller_score))
+                .or_insert(caller_score);
+        }
+    }
+
+    scores
+}
+
+fn query_matches_symbol(query_tokens: &HashSet<String>, symbol: &str) -> bool {
+    if query_tokens.contains(symbol) {
+        return true;
+    }
+
+    let parts: Vec<String> = symbol
+        .split(['_', ':'])
+        .map(|part| part.trim().to_ascii_lowercase())
+        .filter(|part| !part.is_empty())
+        .collect();
+    if parts.is_empty() {
+        return false;
+    }
+
+    parts.iter().all(|part| query_tokens.contains(part))
+}
+
+fn is_test_like_file(path: &str) -> bool {
+    let lower = path.to_ascii_lowercase();
+    lower.starts_with("tests/")
+        || lower.starts_with("test/")
+        || lower.contains("/tests/")
+        || lower.contains("/test/")
+        || lower.contains("_test.")
+        || lower.contains(".test.")
+        || lower.contains("test_")
 }
 
 fn symbol_definitions(chunks: &[Chunk]) -> HashMap<String, HashSet<String>> {
@@ -277,6 +386,35 @@ fn tokenize(text: &str) -> Vec<String> {
         .collect()
 }
 
+pub fn rank_files(root_path: &Path, files: Vec<FileInfo>) -> Result<Vec<FileInfo>> {
+    rank_files_with_weights(root_path, files, RankingWeights::default())
+}
+
+pub fn rank_files_with_weights(
+    root_path: &Path,
+    mut files: Vec<FileInfo>,
+    weights: RankingWeights,
+) -> Result<Vec<FileInfo>> {
+    let scanned_files: HashSet<String> = files.iter().map(|f| f.relative_path.clone()).collect();
+    let ranker = FileRanker::with_weights(root_path, scanned_files, weights);
+    ranker.rank_files(&mut files);
+    Ok(files)
+}
+
+/// Same as `rank_files_with_weights` but also returns manifest info extracted during ranking.
+/// The manifest info includes `scripts`, `name`, `description` from `package.json` etc.
+pub fn rank_files_with_manifest(
+    root_path: &Path,
+    mut files: Vec<FileInfo>,
+    weights: RankingWeights,
+) -> Result<(Vec<FileInfo>, HashMap<String, JsonValue>)> {
+    let scanned_files: HashSet<String> = files.iter().map(|f| f.relative_path.clone()).collect();
+    let ranker = FileRanker::with_weights(root_path, scanned_files, weights);
+    ranker.rank_files(&mut files);
+    let manifest = ranker.get_manifest_info().clone();
+    Ok((files, manifest))
+}
+
 #[cfg(test)]
 mod tests {
     use super::rerank_chunks_by_task;
@@ -316,33 +454,56 @@ mod tests {
         assert!(scores.contains_key("tests/test_auth.py"));
         assert!(scores["tests/test_auth.py"] >= 0.12);
     }
-}
 
-pub fn rank_files(root_path: &Path, files: Vec<FileInfo>) -> Result<Vec<FileInfo>> {
-    rank_files_with_weights(root_path, files, RankingWeights::default())
-}
+    #[test]
+    fn reranking_expands_symbol_callers_and_tests() {
+        let mut chunks = vec![
+            Chunk {
+                id: "1".to_string(),
+                path: "src/auth.py".to_string(),
+                language: "python".to_string(),
+                start_line: 1,
+                end_line: 20,
+                content: "class SessionManager:\n    pass\n\ndef refresh_token(user):\n    return user\n"
+                    .to_string(),
+                priority: 0.55,
+                tags: BTreeSet::from([
+                    "type:SessionManager".to_string(),
+                    "def:refresh_token".to_string(),
+                ]),
+                token_estimate: 16,
+            },
+            Chunk {
+                id: "2".to_string(),
+                path: "src/handler.py".to_string(),
+                language: "python".to_string(),
+                start_line: 1,
+                end_line: 12,
+                content: "from src.auth import refresh_token\n\ndef handle():\n    return refresh_token('u')\n"
+                    .to_string(),
+                priority: 0.2,
+                tags: BTreeSet::new(),
+                token_estimate: 12,
+            },
+            Chunk {
+                id: "3".to_string(),
+                path: "tests/test_auth.py".to_string(),
+                language: "python".to_string(),
+                start_line: 1,
+                end_line: 12,
+                content: "from src.auth import refresh_token\n\ndef test_refresh_token():\n    assert refresh_token('u')\n"
+                    .to_string(),
+                priority: 0.1,
+                tags: BTreeSet::new(),
+                token_estimate: 12,
+            },
+        ];
 
-pub fn rank_files_with_weights(
-    root_path: &Path,
-    mut files: Vec<FileInfo>,
-    weights: RankingWeights,
-) -> Result<Vec<FileInfo>> {
-    let scanned_files: HashSet<String> = files.iter().map(|f| f.relative_path.clone()).collect();
-    let ranker = FileRanker::with_weights(root_path, scanned_files, weights);
-    ranker.rank_files(&mut files);
-    Ok(files)
-}
-
-/// Same as `rank_files_with_weights` but also returns manifest info extracted during ranking.
-/// The manifest info includes `scripts`, `name`, `description` from `package.json` etc.
-pub fn rank_files_with_manifest(
-    root_path: &Path,
-    mut files: Vec<FileInfo>,
-    weights: RankingWeights,
-) -> Result<(Vec<FileInfo>, HashMap<String, JsonValue>)> {
-    let scanned_files: HashSet<String> = files.iter().map(|f| f.relative_path.clone()).collect();
-    let ranker = FileRanker::with_weights(root_path, scanned_files, weights);
-    ranker.rank_files(&mut files);
-    let manifest = ranker.get_manifest_info().clone();
-    Ok((files, manifest))
+        let scores = rerank_chunks_by_task(&mut chunks, "fix refresh token bug", 0.4);
+        assert!(scores.contains_key("src/auth.py"));
+        assert!(scores.contains_key("src/handler.py"));
+        assert!(scores.contains_key("tests/test_auth.py"));
+        assert!(scores["src/handler.py"] > 0.2);
+        assert!(scores["tests/test_auth.py"] > 0.1);
+    }
 }

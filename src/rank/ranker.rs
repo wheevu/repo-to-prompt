@@ -100,9 +100,7 @@ impl FileRanker {
             priority = self.weights.lock_file;
         } else if is_likely_generated(&file.path, &content_sample) {
             priority = self.weights.generated;
-        } else if is_ci_workflow(&rel_lower) {
-            priority = self.weights.config;
-        } else if file.is_config {
+        } else if is_ci_workflow(&rel_lower) || file.is_config {
             priority = self.weights.config;
         } else if self.entrypoints.contains(&rel_normalized) || is_common_entrypoint(&name) {
             priority = self.weights.entrypoint;

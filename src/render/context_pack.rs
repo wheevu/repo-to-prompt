@@ -7,6 +7,7 @@ use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 use std::path::Path;
 
+#[allow(clippy::too_many_arguments)]
 pub fn render_context_pack(
     root_path: &Path,
     files: &[FileInfo],

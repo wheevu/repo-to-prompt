@@ -75,6 +75,7 @@ console = "0.15"
 chrono = { version = "0.4", features = ["serde"] }
 unicode-width = "0.1"
 rustpython-parser = "0.4"
+rusqlite = { version = "0.32", features = ["bundled"] }
 
 [dev-dependencies]
 assert_cmd = "2.0"

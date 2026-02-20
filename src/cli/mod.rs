@@ -1,14 +1,17 @@
 //! Command-line interface for repo-to-prompt
 //!
-//! Provides `export` and `info` subcommands with comprehensive configuration options.
+//! Provides `export`, `index`, and `info` subcommands.
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use tracing::Level;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
+mod codeintel;
 mod export;
+mod index;
 mod info;
+mod query;
 mod utils;
 
 /// Convert repositories into LLM-friendly context packs
@@ -32,6 +35,15 @@ enum Commands {
 
     /// Display repository information without exporting
     Info(info::InfoArgs),
+
+    /// Build a local SQLite index for query-time retrieval
+    Index(index::IndexArgs),
+
+    /// Query a local SQLite index for task-relevant chunks
+    Query(query::QueryArgs),
+
+    /// Export portable code-intel JSON (SCIP-lite)
+    Codeintel(codeintel::CodeIntelArgs),
 }
 
 pub fn run() -> Result<()> {
@@ -52,5 +64,8 @@ pub fn run() -> Result<()> {
     match cli.command {
         Commands::Export(args) => export::run(*args),
         Commands::Info(args) => info::run(args),
+        Commands::Index(args) => index::run(args),
+        Commands::Query(args) => query::run(args),
+        Commands::Codeintel(args) => codeintel::run(args),
     }
 }
