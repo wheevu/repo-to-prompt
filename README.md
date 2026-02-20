@@ -29,6 +29,8 @@ It tries to keep the *important* stuff (READMEs, configs, entrypoints, core sour
 -   **Respects `.gitignore`** by default
 -   **Can clone remote repos** (GitHub / HuggingFace)
 -   **Optional secret redaction** (tokens/keys/password-y strings)
+-   **Task-aware retrieval** (`--task`) with symbol/dependency expansion
+-   **Local index workflow** (`index` / `query`) + portable code-intel export (`codeintel`)
 
 ## Install
 
@@ -63,6 +65,21 @@ repo-to-prompt export --repo https://github.com/owner/repo
 Just show stats (no output files):
 ```bash
 repo-to-prompt info .
+```
+
+Build a local retrieval index once:
+```bash
+repo-to-prompt index --path .
+```
+
+Query the local index:
+```bash
+repo-to-prompt query --task "where is auth token refresh handled?"
+```
+
+Export portable code-intel JSON:
+```bash
+repo-to-prompt codeintel
 ```
 
 ## Common recipes
