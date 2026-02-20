@@ -191,8 +191,7 @@ fn normalize_symbol(text: &str) -> Option<String> {
 
     let last = raw
         .split([':', '.', '/', '\\', '<', '>', '(', ')', ',', ';'])
-        .filter(|s| !s.is_empty())
-        .next_back()
+        .rfind(|s| !s.is_empty())
         .unwrap_or(raw);
     let cleaned: String =
         last.chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '_').collect();
