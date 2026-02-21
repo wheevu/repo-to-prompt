@@ -14,7 +14,7 @@ Turn a code repository into a tidy "context pack" you can paste into an LLM — 
 -   **`chunks.jsonl`** — one chunk per line (great for embeddings + retrieval)
 -   **`report.json`** — stats + what got included/skipped
 
-It tries to keep the *important* stuff (READMEs, configs, entrypoints, core source) and skip the noise (generated files, vendor folders, giant binaries).
+It tries to keep the *important* stuff (READMEs, configs, entrypoints, core source) and skip the less impactful resources (generated files, vendor folders, giant binaries).
 
 ## Why you'd use it
 
@@ -128,25 +128,10 @@ repo-context export -p . --max-tokens 50000
 repo-context export -p . --max-tokens 50000 --allow-over-budget
 ```
 
-**Contribution/PR packs with protected invariant files**
-```bash
-# defaults to pinned-only fallback when protected files exceed budget
-repo-context export -p . --mode contribution --max-tokens 12000
-
-# fail instead of fallback when protected set exceeds budget
-repo-context export -p . --mode contribution --max-tokens 12000 --strict-budget
-
-# explicit path/glob pins (repeatable flags supported)
-repo-context export -p . --mode contribution \
-  --always-include-path CONTRIBUTING.md \
-  --always-include-path SECURITY.md \
-  --always-include-glob "docs/contracts/**"
-```
-
 **Best stitching quality (index first, export second)**
 ```bash
 repo-context index -p .
-repo-context export -p . --from-index --task "trace auth refresh flow"
+repo-context export -p . --task "trace auth refresh flow"
 ```
 
 **Build local index and query it repeatedly**
@@ -154,9 +139,6 @@ repo-context export -p . --from-index --task "trace auth refresh flow"
 repo-context index -p .
 repo-context query --task "where are retries and backoff handled?" --expand
 ```
-
-For remote repos, `index --repo` now stores the default index in a persistent cache keyed by
-`repo_url + ref + config_hash`, so later `export --from-index` can reuse it.
 
 **Portable code-intel output from local index**
 ```bash
@@ -201,7 +183,6 @@ repo-context diff out/repo-a out/repo-b --format json
 **Retrieval and ranking**
 -   `-t, --max-tokens <TOKENS>` output token budget
 -   `--allow-over-budget` allow always-include overflow
--   `--strict-budget` fail when protected pins exceed token budget
 -   `--task <TEXT>` task-aware reranking query
 -   `--no-semantic-rerank` disable semantic rerank stage
 -   `--semantic-model <MODEL>` semantic model identifier
@@ -221,14 +202,6 @@ repo-context diff out/repo-a out/repo-b --format json
 -   `--tree-depth <DEPTH>` tree depth in rendered context pack
 -   `--no-graph` skip `symbol_graph.db` output
 -   `--quick` skip guided menu and run non-interactive defaults
--   `--from-index` prefer loading files/chunks from fresh local index
--   `--require-fresh-index` fail if index is missing/stale when `--from-index` is used
-
-**Contribution pinning/invariants**
--   `--always-include-path <PATHS>` hard Tier-0 pins (repeatable or CSV)
--   `--always-include-glob <GLOBS>` Tier-1 protected pin patterns (repeatable or CSV)
--   `--invariant-keywords <WORDS>` replace invariant discovery keyword set
--   `--invariant-keywords-add <WORDS>` append to invariant discovery keyword set
 
 **Redaction**
 -   `--no-redact` disable secret redaction
