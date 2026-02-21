@@ -149,9 +149,9 @@ expression: normalized_report
     }
   ],
   "output_files": [
-    "/<OUTPUT_DIR>/chunks.jsonl",
-    "/<OUTPUT_DIR>/context_pack.md",
-    "/<OUTPUT_DIR>/symbol_graph.db"
+    "/<OUTPUT_DIR>/<FIXTURE_REPO>_chunks.jsonl",
+    "/<OUTPUT_DIR>/<FIXTURE_REPO>_context_pack.md",
+    "/<OUTPUT_DIR>/<FIXTURE_REPO>_symbol_graph.db"
   ],
   "schema_version": "1.0.0",
   "stats": {

@@ -293,7 +293,7 @@ fn render_markdown(summary: &DiffSummary) {
 }
 
 fn read_report(dir: &Path) -> Result<ReportDoc> {
-    let path = dir.join("report.json");
+    let path = resolve_output_artifact(dir, "report.json")?;
     let data = fs::read_to_string(&path)
         .with_context(|| format!("Failed to read report.json at {}", path.display()))?;
     serde_json::from_str::<ReportDoc>(&data)
@@ -301,10 +301,9 @@ fn read_report(dir: &Path) -> Result<ReportDoc> {
 }
 
 fn read_chunks(dir: &Path) -> Result<Vec<ChunkRow>> {
-    let path = dir.join("chunks.jsonl");
-    if !path.exists() {
+    let Some(path) = resolve_output_artifact_optional(dir, "chunks.jsonl")? else {
         return Ok(Vec::new());
-    }
+    };
     let content = fs::read_to_string(&path)
         .with_context(|| format!("Failed to read chunks.jsonl at {}", path.display()))?;
     let mut rows = Vec::new();
@@ -334,8 +333,7 @@ fn compare_graphs(before_dir: &Path, after_dir: &Path) -> Option<GraphDelta> {
 }
 
 fn resolve_graph_db(dir: &Path) -> Option<PathBuf> {
-    let symbol_graph = dir.join("symbol_graph.db");
-    if symbol_graph.exists() {
+    if let Ok(Some(symbol_graph)) = resolve_output_artifact_optional(dir, "symbol_graph.db") {
         return Some(symbol_graph);
     }
     let index_db = dir.join(".repo-context").join("index.sqlite");
@@ -343,6 +341,40 @@ fn resolve_graph_db(dir: &Path) -> Option<PathBuf> {
         return Some(index_db);
     }
     None
+}
+
+fn resolve_output_artifact(dir: &Path, base_name: &str) -> Result<PathBuf> {
+    resolve_output_artifact_optional(dir, base_name)?.with_context(|| {
+        format!("Missing expected output file ending in '{base_name}' under {}", dir.display())
+    })
+}
+
+fn resolve_output_artifact_optional(dir: &Path, base_name: &str) -> Result<Option<PathBuf>> {
+    let exact = dir.join(base_name);
+    if exact.exists() {
+        return Ok(Some(exact));
+    }
+
+    let suffix = format!("_{base_name}");
+    let mut candidates = Vec::new();
+    for entry in fs::read_dir(dir)
+        .with_context(|| format!("Failed to list output directory {}", dir.display()))?
+    {
+        let entry = entry?;
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        if name.ends_with(&suffix) {
+            candidates.push(path);
+        }
+    }
+
+    candidates.sort();
+    Ok(candidates.into_iter().next())
 }
 
 fn load_symbol_pairs(path: &Path) -> Option<HashSet<(String, String)>> {

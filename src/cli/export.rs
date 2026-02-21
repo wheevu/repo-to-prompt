@@ -466,6 +466,7 @@ pub fn run(args: ExportArgs) -> Result<()> {
     stats.total_tokens_estimated = chunks.iter().map(|c| c.token_estimate).sum();
 
     let output_dir = resolve_output_dir(&merged.output_dir, &root_path);
+    let repo_name = repo_name_for_output(&root_path);
     fs::create_dir_all(&output_dir)?;
     let mut graph_written: Option<(PathBuf, usize, usize)> = None;
     if !args.no_graph {
@@ -480,7 +481,8 @@ pub fn run(args: ExportArgs) -> Result<()> {
                 println!(
                     "info: index.sqlite exists but graph tables are missing; using pack-only graph."
                 );
-                let graph_path = output_dir.join("symbol_graph.db");
+                let graph_path =
+                    output_dir.join(prefixed_output_file_name(&repo_name, "symbol_graph.db"));
                 match open_or_create(&graph_path) {
                     Ok(mut conn) => match persist_graph(&mut conn, &chunks) {
                         Ok((symbols, edges)) => {
@@ -499,7 +501,8 @@ pub fn run(args: ExportArgs) -> Result<()> {
             println!(
                 "info: no index.sqlite found — using pack-only graph. Run 'repo-context index' for full graph + better stitching."
             );
-            let graph_path = output_dir.join("symbol_graph.db");
+            let graph_path =
+                output_dir.join(prefixed_output_file_name(&repo_name, "symbol_graph.db"));
             match open_or_create(&graph_path) {
                 Ok(mut conn) => match persist_graph(&mut conn, &chunks) {
                     Ok((symbols, edges)) => {
@@ -552,7 +555,7 @@ pub fn run(args: ExportArgs) -> Result<()> {
         merged.mode,
         OutputMode::Prompt | OutputMode::Both | OutputMode::Contribution | OutputMode::PrContext
     ) {
-        let p = output_dir.join("context_pack.md");
+        let p = output_dir.join(prefixed_output_file_name(&repo_name, "context_pack.md"));
         fs::write(&p, context_pack)?;
         output_files.push(p.display().to_string());
     }
@@ -560,7 +563,7 @@ pub fn run(args: ExportArgs) -> Result<()> {
         merged.mode,
         OutputMode::Rag | OutputMode::Both | OutputMode::Contribution | OutputMode::PrContext
     ) {
-        let p = output_dir.join("chunks.jsonl");
+        let p = output_dir.join(prefixed_output_file_name(&repo_name, "chunks.jsonl"));
         fs::write(&p, jsonl)?;
         output_files.push(p.display().to_string());
     }
@@ -569,7 +572,7 @@ pub fn run(args: ExportArgs) -> Result<()> {
         output_files.push(graph_path.display().to_string());
     }
 
-    let report_path = output_dir.join("report.json");
+    let report_path = output_dir.join(prefixed_output_file_name(&repo_name, "report.json"));
     // Record processing time before writing the report so the value is correct in report.json.
     stats.processing_time_seconds = start_time.elapsed().as_secs_f64();
 
@@ -722,7 +725,7 @@ pub fn run(args: ExportArgs) -> Result<()> {
 }
 
 fn resolve_output_dir(config_output: &Path, root_path: &Path) -> PathBuf {
-    let repo_name = root_path.file_name().and_then(|n| n.to_str()).unwrap_or("repo");
+    let repo_name = repo_name_for_output(root_path);
     let normalized = config_output.to_string_lossy().replace('\\', "/");
 
     let base = if normalized.is_empty() || normalized == "./out" || normalized == "out" {
@@ -733,11 +736,19 @@ fn resolve_output_dir(config_output: &Path, root_path: &Path) -> PathBuf {
 
     // Always namespace by repo name unless the path already ends with it
     // (matches Python's get_repo_output_dir in cli.py:93-109).
-    if base.file_name().and_then(|n| n.to_str()) == Some(repo_name) {
+    if base.file_name().and_then(|n| n.to_str()) == Some(repo_name.as_str()) {
         base
     } else {
         base.join(repo_name)
     }
+}
+
+fn repo_name_for_output(root_path: &Path) -> String {
+    root_path.file_name().and_then(|n| n.to_str()).unwrap_or("repo").to_string()
+}
+
+fn prefixed_output_file_name(repo_name: &str, base_name: &str) -> String {
+    format!("{repo_name}_{base_name}")
 }
 
 fn find_index_db(root_path: &Path) -> Option<PathBuf> {

@@ -42,10 +42,17 @@ fn golden_export_outputs_are_stable() {
         output_dir.join(repo_name)
     };
 
-    let context =
-        fs::read_to_string(actual_output_dir.join("context_pack.md")).expect("context pack");
-    let chunks = fs::read_to_string(actual_output_dir.join("chunks.jsonl")).expect("chunks");
-    let report_raw = fs::read_to_string(actual_output_dir.join("report.json")).expect("report");
+    let context = fs::read_to_string(
+        actual_output_dir.join(output_file_name(fixture.root(), "context_pack.md")),
+    )
+    .expect("context pack");
+    let chunks = fs::read_to_string(
+        actual_output_dir.join(output_file_name(fixture.root(), "chunks.jsonl")),
+    )
+    .expect("chunks");
+    let report_raw =
+        fs::read_to_string(actual_output_dir.join(output_file_name(fixture.root(), "report.json")))
+            .expect("report");
     let report_json: Value = serde_json::from_str(&report_raw).expect("report json");
 
     let normalized_context = normalize_context(&context, fixture.root());
@@ -76,7 +83,7 @@ fn normalize_chunks(input: &str, fixture_root: &Path) -> String {
     input.replace(fixture_root.to_str().expect("fixture root str"), "/<FIXTURE_ROOT>")
 }
 
-fn normalize_report(mut report: Value, _fixture_root: &Path) -> Value {
+fn normalize_report(mut report: Value, fixture_root: &Path) -> Value {
     if let Some(config) = report.get_mut("config").and_then(Value::as_object_mut) {
         if let Some(path) = config.get_mut("path") {
             *path = Value::String("/<FIXTURE_ROOT>".to_string());
@@ -100,7 +107,8 @@ fn normalize_report(mut report: Value, _fixture_root: &Path) -> Value {
                     .and_then(|n| n.to_str())
                     .unwrap_or(path_str)
                     .to_string();
-                *output = Value::String(format!("/<OUTPUT_DIR>/{}", file_name));
+                let normalized_name = normalize_output_file_name(&file_name, fixture_root);
+                *output = Value::String(format!("/<OUTPUT_DIR>/{}", normalized_name));
             }
         }
     }
@@ -114,6 +122,22 @@ fn normalize_report(mut report: Value, _fixture_root: &Path) -> Value {
     }
 
     report
+}
+
+fn output_file_name(repo_root: &Path, base_name: &str) -> String {
+    let repo_name = repo_root.file_name().and_then(|n| n.to_str()).unwrap_or("repo");
+    format!("{repo_name}_{base_name}")
+}
+
+fn normalize_output_file_name(file_name: &str, fixture_root: &Path) -> String {
+    let repo_name = fixture_root.file_name().and_then(|n| n.to_str()).unwrap_or("repo");
+    for suffix in ["context_pack.md", "chunks.jsonl", "report.json", "symbol_graph.db"] {
+        let expected = format!("{repo_name}_{suffix}");
+        if file_name == expected {
+            return format!("<FIXTURE_REPO>_{suffix}");
+        }
+    }
+    file_name.to_string()
 }
 
 struct GoldenRepo {

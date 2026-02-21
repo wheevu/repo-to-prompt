@@ -18,12 +18,20 @@ fn export_is_deterministic_without_timestamp() {
     let actual1 = resolve_output_dir(&out1, fixture.root());
     let actual2 = resolve_output_dir(&out2, fixture.root());
 
-    let context1 = fs::read_to_string(actual1.join("context_pack.md")).expect("read context 1");
-    let context2 = fs::read_to_string(actual2.join("context_pack.md")).expect("read context 2");
+    let context1 =
+        fs::read_to_string(actual1.join(output_file_name(fixture.root(), "context_pack.md")))
+            .expect("read context 1");
+    let context2 =
+        fs::read_to_string(actual2.join(output_file_name(fixture.root(), "context_pack.md")))
+            .expect("read context 2");
     assert_eq!(context1, context2);
 
-    let chunks1 = fs::read_to_string(actual1.join("chunks.jsonl")).expect("read chunks 1");
-    let chunks2 = fs::read_to_string(actual2.join("chunks.jsonl")).expect("read chunks 2");
+    let chunks1 =
+        fs::read_to_string(actual1.join(output_file_name(fixture.root(), "chunks.jsonl")))
+            .expect("read chunks 1");
+    let chunks2 =
+        fs::read_to_string(actual2.join(output_file_name(fixture.root(), "chunks.jsonl")))
+            .expect("read chunks 2");
     assert_eq!(chunks1, chunks2);
 }
 
@@ -37,7 +45,8 @@ fn export_applies_redaction_and_report_shape() {
 
     let actual = resolve_output_dir(&out, fixture.root());
 
-    let chunks = fs::read_to_string(actual.join("chunks.jsonl")).expect("read chunks");
+    let chunks = fs::read_to_string(actual.join(output_file_name(fixture.root(), "chunks.jsonl")))
+        .expect("read chunks");
     assert!(!chunks.contains("sk-abcdefghijklmnopqrstuvwxyz12345"));
     assert!(
         chunks.contains("[REDACTED_OPENAI_KEY]")
@@ -45,7 +54,9 @@ fn export_applies_redaction_and_report_shape() {
             || chunks.contains("[HIGH_ENTROPY_REDACTED]")
     );
 
-    let report_raw = fs::read_to_string(actual.join("report.json")).expect("read report");
+    let report_raw =
+        fs::read_to_string(actual.join(output_file_name(fixture.root(), "report.json")))
+            .expect("read report");
     let report: serde_json::Value = serde_json::from_str(&report_raw).expect("parse report");
     assert_eq!(report["schema_version"], serde_json::json!("1.0.0"));
     assert!(report.get("generated_at").is_none());
@@ -70,7 +81,9 @@ fn report_processing_time_is_nonzero() {
     run_export(fixture.root(), &out);
 
     let actual = resolve_output_dir(&out, fixture.root());
-    let report_raw = fs::read_to_string(actual.join("report.json")).expect("read report");
+    let report_raw =
+        fs::read_to_string(actual.join(output_file_name(fixture.root(), "report.json")))
+            .expect("read report");
     let report: serde_json::Value = serde_json::from_str(&report_raw).expect("parse report");
 
     let processing_time = report["stats"]["processing_time_seconds"]
@@ -104,7 +117,9 @@ fn export_task_reranking_is_recorded_in_report() {
     cmd.assert().success();
 
     let actual = resolve_output_dir(&out, fixture.root());
-    let report_raw = fs::read_to_string(actual.join("report.json")).expect("read report");
+    let report_raw =
+        fs::read_to_string(actual.join(output_file_name(fixture.root(), "report.json")))
+            .expect("read report");
     let report: serde_json::Value = serde_json::from_str(&report_raw).expect("parse report");
 
     assert_eq!(report["config"]["task_query"], serde_json::json!("guide documentation"));
@@ -142,6 +157,11 @@ fn resolve_output_dir(output_dir: &Path, repo_root: &Path) -> std::path::PathBuf
     } else {
         output_dir.join(repo_name)
     }
+}
+
+fn output_file_name(repo_root: &Path, base_name: &str) -> String {
+    let repo_name = repo_root.file_name().and_then(|n| n.to_str()).unwrap_or("repo");
+    format!("{repo_name}_{base_name}")
 }
 
 struct TestRepo {
@@ -218,7 +238,8 @@ fn byte_budget_breaks_on_limit_and_drops_all_remaining() {
     cmd.assert().success();
 
     let actual = resolve_output_dir(&out, root);
-    let report_raw = fs::read_to_string(actual.join("report.json")).expect("read report");
+    let report_raw = fs::read_to_string(actual.join(output_file_name(root, "report.json")))
+        .expect("read report");
     let report: serde_json::Value = serde_json::from_str(&report_raw).expect("parse report");
 
     // At least large.py and small2.py should be dropped
